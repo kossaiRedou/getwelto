@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+{% load welto %}
+{% block title %}Produits{% endblock %}
+{% block content %}
+{% with is_mgr=request.user|manager %}
+<div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+  <h1 class="text-xl font-bold">Produits</h1>
+  {% if is_mgr %}
+  <div class="flex gap-2">
+    <a href="{% url 'product:category_management' %}" class="btn btn-light">{% icon 'folder' 'h-4 w-4' %} Catégories</a>
+    <a href="{% url 'product:add_product' %}" class="btn btn-primary">{% icon 'plus' 'h-4 w-4' %} Ajouter</a>
+  </div>
+  {% endif %}
+</div>
+
+<form method="get" class="card mb-4 grid gap-3 p-3 sm:grid-cols-[1fr_auto_auto_auto]">
+  <input name="q" value="{{ q }}" class="input" placeholder="Nom, code-barres ou catégorie">
+  <select name="category" class="input">
+    <option value="">Toutes catégories</option>
+    {% for c in categories %}<option value="{{ c.pk }}" {% if category == c.pk|stringformat:'s' %}selected{% endif %}>{{ c.title }}</option>{% endfor %}
+  </select>
+  <select name="status" class="input">
+    <option value="">En vente</option>
+    <option value="low" {% if status == 'low' %}selected{% endif %}>Stock bas ({{ low_count }})</option>
+    <option value="inactive" {% if status == 'inactive' %}selected{% endif %}>Retirés de la vente</option>
+    <option value="all" {% if status == 'all' %}selected{% endif %}>Tous</option>
+  </select>
+  <button class="btn btn-dark">{% icon 'search' 'h-4 w-4' %} Filtrer</button>
+</form>
+
+<div class="card overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="table">
+      <thead><tr><th>Produit</th><th>Catégorie</th><th class="text-right">Prix</th>{% if is_mgr %}<th class="text-right">Achat</th>{% endif %}<th class="text-right">Stock</th>{% if is_mgr %}<th></th>{% endif %}</tr></thead>
+      <tbody>
+      {% for p in page_obj %}
+        <tr class="{% if not p.active %}opacity-60{% endif %}">
+          <td><span class="font-semibold">{{ p.title }}</span>{% if p.barcode %}<span class="block text-xs text-slate-400">{{ p.barcode }}</span>{% endif %}{% if not p.active %} <span class="badge badge-gray">retiré</span>{% endif %}</td>
+          <td class="text-slate-600">{{ p.category.title|default:"—" }}</td>
+          <td class="num text-right font-semibold">{{ p.final_value|money }}{% if p.discount_value %}<span class="block text-xs font-normal text-slate-400 line-through">{{ p.value|money }}</span>{% endif %}</td>
+          {% if is_mgr %}<td class="num text-right text-slate-500">{{ p.prix_achat|money }}</td>{% endif %}
+          <td class="text-right"><span class="badge {% if p.qty == 0 %}badge-red{% elif p.qty < threshold %}badge-amber{% else %}badge-green{% endif %}">{{ p.qty }}</span></td>
+          {% if is_mgr %}
+          <td class="whitespace-nowrap text-right">
+            <a href="{% url 'product:quick_stock' p.pk %}" class="btn btn-light btn-sm">{% icon 'truck' 'h-4 w-4' %} Stock</a>
+            <a href="{% url 'product:edit_product' p.pk %}" class="btn btn-ghost btn-sm" aria-label="Modifier">{% icon 'edit' 'h-4 w-4' %}</a>
+          </td>
+          {% endif %}
+        </tr>
+      {% empty %}
+        <tr><td colspan="6" class="py-10 text-center text-slate-500">Aucun produit.{% if is_mgr %} <a href="{% url 'product:add_product' %}" class="font-semibold text-navy-700 underline">Ajouter le premier</a>{% endif %}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include 'partials/pagination.html' %}
+</div>
+{% endwith %}
+{% endblock %}

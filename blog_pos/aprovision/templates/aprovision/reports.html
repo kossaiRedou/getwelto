@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+{% load welto %}
+{% block title %}Rapports{% endblock %}
+{% block content %}
+<div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+  <h1 class="text-xl font-bold">Rapports <span class="text-base font-normal text-slate-500">du {{ start|date:"d/m/Y" }} au {{ end|date:"d/m/Y" }}</span></h1>
+</div>
+
+<form method="get" class="card mb-4 flex flex-wrap items-end gap-2 p-3">
+  {% for label, s, e in presets %}
+  <a href="?start={{ s|date:'Y-m-d' }}&end={{ e|date:'Y-m-d' }}" class="btn btn-sm {% if s == start and e == end %}btn-dark{% else %}btn-light{% endif %}">{{ label }}</a>
+  {% endfor %}
+  <div class="ml-auto flex flex-wrap items-center gap-2">
+    <input type="date" name="start" value="{{ start|date:'Y-m-d' }}" class="input w-auto py-1.5 text-sm" aria-label="Du">
+    <input type="date" name="end" value="{{ end|date:'Y-m-d' }}" class="input w-auto py-1.5 text-sm" aria-label="Au">
+    <button class="btn btn-dark btn-sm">Afficher</button>
+  </div>
+</form>
+
+<div class="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+  <div class="kpi"><p class="kpi-label">Chiffre d'affaires</p><p class="kpi-value">{{ sales.total|money }}</p><p class="mt-1 text-xs text-slate-500">{{ sales.count }} vente{{ sales.count|pluralize }} · panier moyen {{ avg_basket|money }}</p></div>
+  <div class="kpi"><p class="kpi-label">Marge brute</p><p class="kpi-value text-emerald-700">{{ margin|money }}</p><p class="mt-1 text-xs text-slate-500">Ventes − coût d'achat ({{ cogs|money }})</p></div>
+  <div class="kpi"><p class="kpi-label">Autres dépenses</p><p class="kpi-value {% if other_total %}text-rose-700{% endif %}">{{ other_total|money }}</p><p class="mt-1 text-xs text-slate-500">hors achats de marchandises</p></div>
+  <div class="kpi"><p class="kpi-label">Bénéfice net</p><p class="kpi-value {% if net < 0 %}text-rose-700{% else %}text-emerald-700{% endif %}">{{ net|money }}</p><p class="mt-1 text-xs text-slate-500">Marge − autres dépenses</p></div>
+</div>
+{% if missing_cost %}
+<p class="mb-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200">{% icon 'alert' 'mr-1 inline h-4 w-4' %} {{ missing_cost }} produit{{ missing_cost|pluralize }} vendu{{ missing_cost|pluralize }} sans prix d'achat : la marge est surestimée. Renseignez le prix d'achat dans la fiche produit.</p>
+{% endif %}
+
+<div class="grid gap-4 lg:grid-cols-3">
+  {% if series %}
+  <div class="card p-4 lg:col-span-3">
+    <h2 class="mb-4 font-semibold">Ventes par jour <span class="text-sm font-normal text-slate-500">({{ currency }})</span></h2>
+    <div class="flex h-44 items-end gap-0.5 sm:gap-1">
+      {% for d in series %}
+      <div class="group relative flex h-full flex-1 flex-col justify-end" title="{{ d.date|date:'d/m' }} : {{ d.total|money }}">
+        <div class="w-full rounded-t-sm bg-navy-700 group-hover:bg-amber-500" style="height: {{ d.pct }}%; min-height: 1px"></div>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="mt-1 flex justify-between text-xs text-slate-500"><span>{{ start|date:"d/m" }}</span><span>{{ end|date:"d/m" }}</span></div>
+  </div>
+  {% endif %}
+
+  <div class="card p-4">
+    <h2 class="mb-1 font-semibold">Encaissements</h2>
+    <p class="mb-3 text-xs text-slate-500">Argent reçu sur la période (ventes + règlements de crédits), par mode : à comparer avec la caisse.</p>
+    <ul class="space-y-2 text-sm">
+      {% for m in by_method %}<li class="flex justify-between"><span>{{ m.label }}</span><span class="num font-semibold">{{ m.total|money }}</span></li>{% empty %}<li class="text-slate-500">Aucun encaissement.</li>{% endfor %}
+      <li class="flex justify-between border-t border-slate-100 pt-2 font-bold"><span>Total</span><span class="num">{{ collected|money }}</span></li>
+    </ul>
+    <div class="mt-4 rounded-lg bg-slate-50 p-3 text-sm">
+      <div class="flex justify-between"><span class="text-slate-500">Vendu à crédit (non encore payé)</span><span class="num font-semibold text-rose-700">{{ sales.remaining|money }}</span></div>
+      <div class="mt-1 flex justify-between"><span class="text-slate-500">Articles vendus</span><span class="num">{{ qty_sold }}</span></div>
+    </div>
+  </div>
+
+  <div class="card p-4">
+    <h2 class="mb-3 font-semibold">Dépenses</h2>
+    <ul class="space-y-2 text-sm">
+      <li class="flex justify-between"><span>Achats de marchandises</span><span class="num font-semibold">{{ purchases|money }}</span></li>
+      {% for d in other_by_type %}<li class="flex justify-between"><span>{{ d.type_depense__nom }}</span><span class="num font-semibold">{{ d.s|money }}</span></li>{% endfor %}
+    </ul>
+    <a href="{% url 'aprovision:depense_list' %}?start={{ start|date:'Y-m-d' }}&end={{ end|date:'Y-m-d' }}" class="mt-3 inline-block text-sm text-navy-700 hover:underline">Détail des dépenses →</a>
+  </div>
+
+  <div class="card p-4">
+    <h2 class="mb-3 font-semibold">Par catégorie</h2>
+    <ul class="space-y-2 text-sm">
+      {% for c in by_category %}<li class="flex gap-2"><span class="truncate">{{ c.product__category__title|default:"Sans catégorie" }}</span><span class="ml-auto text-slate-500">×{{ c.qty }}</span><span class="num w-24 text-right font-semibold">{{ c.total|money }}</span></li>{% empty %}<li class="text-slate-500">—</li>{% endfor %}
+    </ul>
+  </div>
+
+  <div class="card overflow-hidden lg:col-span-3">
+    <h2 class="px-4 pt-4 font-semibold">Meilleurs produits</h2>
+    <div class="overflow-x-auto">
+      <table class="table mt-2">
+        <thead><tr><th>Produit</th><th class="text-right">Quantité</th><th class="text-right">Montant</th></tr></thead>
+        <tbody>
+        {% for p in top_products %}<tr><td>{{ p.product__title }}</td><td class="num text-right">{{ p.qty }}</td><td class="num text-right font-semibold">{{ p.total|money }}</td></tr>
+        {% empty %}<tr><td colspan="3" class="py-6 text-center text-slate-500">Aucune vente sur la période.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

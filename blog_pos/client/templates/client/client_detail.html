@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+{% load welto %}
+{% block title %}{{ client.name }}{% endblock %}
+{% block content %}
+<div class="mb-4 flex flex-wrap items-center gap-3">
+  <a href="{% url 'client:client_list' %}" class="btn btn-ghost px-2" aria-label="Retour">{% icon 'back' %}</a>
+  <div class="min-w-0">
+    <h1 class="truncate text-xl font-bold">{{ client.name }}{% if not client.is_active %} <span class="badge badge-gray">désactivé</span>{% endif %}</h1>
+    <a href="tel:{{ client.phone }}" class="text-sm text-slate-500 hover:underline">{{ client.phone }}</a>
+  </div>
+  <div class="ml-auto flex gap-2">
+    <a href="{% url 'client:edit_client' client.pk %}" class="btn btn-light">{% icon 'edit' 'h-4 w-4' %} Modifier</a>
+    {% if request.user|manager and not n_orders %}<a href="{% url 'client:delete_client' client.pk %}" class="btn btn-ghost text-rose-600" aria-label="Supprimer">{% icon 'trash' 'h-4 w-4' %}</a>{% endif %}
+  </div>
+</div>
+
+<div class="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+  <div class="kpi"><p class="kpi-label">Dette actuelle</p><p class="kpi-value {% if debt %}text-rose-700{% endif %}">{{ debt|money }}</p></div>
+  <div class="kpi"><p class="kpi-label">Achats</p><p class="kpi-value">{{ total_spent|money }}</p></div>
+  <div class="kpi"><p class="kpi-label">Ventes</p><p class="kpi-value">{{ n_orders }}</p></div>
+  <div class="kpi"><p class="kpi-label">Articles achetés</p><p class="kpi-value">{{ qty_bought }}</p></div>
+</div>
+
+{% if unpaid_orders %}
+<div class="card mb-4 overflow-hidden ring-1 ring-rose-200">
+  <h2 class="px-4 pt-4 font-semibold text-rose-800">Ventes à régler</h2>
+  <div class="overflow-x-auto">
+    <table class="table mt-2">
+      <thead><tr><th>N°</th><th>Date</th><th class="text-right">Total</th><th class="text-right">Reste</th><th></th></tr></thead>
+      <tbody>
+      {% for o in unpaid_orders %}
+        <tr>
+          <td class="font-semibold">{{ o.title }}</td>
+          <td class="num text-slate-500">{{ o.date|date:"d/m/Y" }}</td>
+          <td class="num text-right">{{ o.final_value|money }}</td>
+          <td class="num text-right font-semibold text-rose-700">{{ o.remaining_amount|money }}</td>
+          <td class="text-right"><a href="{{ o.get_absolute_url }}" class="btn btn-primary btn-sm">Encaisser</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<div class="card overflow-hidden">
+  <form method="get" class="flex flex-wrap items-center gap-2 px-4 pt-4">
+    <h2 class="mr-auto font-semibold">Historique</h2>
+    <input type="date" name="start" value="{{ start|date:'Y-m-d' }}" class="input w-auto py-1.5 text-sm" aria-label="Du">
+    <input type="date" name="end" value="{{ end|date:'Y-m-d' }}" class="input w-auto py-1.5 text-sm" aria-label="Au">
+    <button class="btn btn-light btn-sm">Filtrer</button>
+  </form>
+  <div class="overflow-x-auto">
+    <table class="table mt-2">
+      <thead><tr><th>N°</th><th>Date</th><th class="text-right">Total</th><th>Statut</th></tr></thead>
+      <tbody>
+      {% for o in orders %}
+        <tr class="cursor-pointer" onclick="location.href='{{ o.get_absolute_url }}'">
+          <td><a href="{{ o.get_absolute_url }}" class="font-semibold hover:underline">{{ o.title }}</a></td>
+          <td class="num text-slate-500">{{ o.timestamp|date:"d/m/Y H:i" }}</td>
+          <td class="num text-right">{{ o.final_value|money }}</td>
+          <td>{% if o.is_paid %}<span class="badge badge-green">Payée</span>{% else %}<span class="badge badge-red">Reste {{ o.remaining_amount|money }}</span>{% endif %}</td>
+        </tr>
+      {% empty %}<tr><td colspan="4" class="py-8 text-center text-slate-500">Aucune vente.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

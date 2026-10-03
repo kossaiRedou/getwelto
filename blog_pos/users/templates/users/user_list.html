@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% load welto %}
+{% block title %}Utilisateurs{% endblock %}
+{% block content %}
+<div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+  <h1 class="text-xl font-bold">Utilisateurs</h1>
+  <a href="{% url 'users:user_create' %}" class="btn btn-primary">{% icon 'plus' 'h-4 w-4' %} Nouvel utilisateur</a>
+</div>
+<form method="get" class="card mb-4 flex gap-2 p-3">
+  <input name="q" value="{{ q }}" class="input" placeholder="Nom, identifiant ou téléphone">
+  <button class="btn btn-dark">{% icon 'search' 'h-4 w-4' %}</button>
+</form>
+<div class="card overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="table">
+      <thead><tr><th>Nom</th><th>Identifiant</th><th>Rôle</th><th>Statut</th><th></th></tr></thead>
+      <tbody>
+      {% for u in page_obj %}
+        <tr class="{% if not u.is_active %}opacity-60{% endif %}">
+          <td class="font-semibold">{{ u.get_full_name|default:"—" }}{% if u == request.user %} <span class="badge badge-gray">vous</span>{% endif %}</td>
+          <td class="text-slate-600">{{ u.username }}</td>
+          <td>{% if u.role == 'manager' %}<span class="badge badge-amber">Manager</span>{% else %}<span class="badge badge-gray">Employé</span>{% endif %}</td>
+          <td>{% if u.is_active %}<span class="badge badge-green">Actif</span>{% else %}<span class="badge badge-red">Désactivé</span>{% endif %}</td>
+          <td class="whitespace-nowrap text-right">
+            <a href="{% url 'users:user_update' u.pk %}" class="btn btn-ghost btn-sm" aria-label="Modifier">{% icon 'edit' 'h-4 w-4' %}</a>
+            <a href="{% url 'users:change_password' u.pk %}" class="btn btn-ghost btn-sm" aria-label="Mot de passe">{% icon 'key' 'h-4 w-4' %}</a>
+            {% if u != request.user %}<a href="{% url 'users:user_delete' u.pk %}" class="btn btn-ghost btn-sm text-rose-600" aria-label="Supprimer">{% icon 'trash' 'h-4 w-4' %}</a>{% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include 'partials/pagination.html' %}
+</div>
+{% endblock %}

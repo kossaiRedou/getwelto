@@ -1,0 +1,52 @@
+# ============================================
+# WELTO POS (app web)
+# ============================================
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environnements virtuels
+dama_env/
+venv/
+.venv/
+env/
+
+# Données locales (jamais dans le dépôt)
+.env
+.env.local
+db.sqlite3*
+media/
+logs/
+*.log
+secret_key.txt
+blog_pos/staticfiles/
+
+# Outils
+node_modules/
+tailwindcss
+tailwindcss.exe
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Anciens fichiers de la version desktop / cloud (à supprimer du disque)
+cloud_server/
+desktop_app/
+build/
+dist/
+scripts/
+*.spec
+build_standalone.py
+blog_pos/Welto.py
+blog_pos/sync/
+blog_pos/licensing/
+blog_pos/order/static/
+blog_pos/order/templates/source/
+
+# Sauvegarde de l'ancien historique git (version desktop)
+.git_ancien/

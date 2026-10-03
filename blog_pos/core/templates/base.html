@@ -1,0 +1,62 @@
+{% load static welto %}<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f1b2d">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <title>{% block title %}{% endblock %} · {{ company_name|default:"WELTO" }}</title>
+  <link rel="icon" href="{% static 'img/favicon.svg' %}" type="image/svg+xml">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <script src="{% static 'js/app.js' %}" defer></script>
+  {% block head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+{% with rm=request.resolver_match %}
+<aside class="fixed inset-y-0 left-0 z-40 flex w-64 -translate-x-full flex-col bg-navy-900 transition-transform lg:w-60 lg:translate-x-0 [.nav-open_&]:translate-x-0">
+  <a href="{% url 'pos' %}" class="flex h-14 shrink-0 items-center gap-2 border-b border-navy-800 px-4">
+    <span class="grid h-8 w-8 place-items-center rounded-lg bg-amber-500 font-black text-navy-950">W</span>
+    <span class="truncate font-semibold text-white">{{ company_name|default:"WELTO" }}</span>
+  </a>
+  <nav class="flex-1 space-y-1 overflow-y-auto p-3">
+    <a href="{% url 'pos' %}" class="nav-link {% if rm.url_name == 'pos' %}active{% endif %}">{% icon 'cart' %} Caisse</a>
+    <a href="{% url 'order_list' %}" class="nav-link {% if rm.url_name == 'order_list' or rm.url_name == 'order_detail' %}active{% endif %}">{% icon 'receipt' %} Ventes</a>
+    <a href="{% url 'client:client_list' %}" class="nav-link {% if rm.namespace == 'client' %}active{% endif %}">{% icon 'users' %} Clients</a>
+    <a href="{% url 'product:product_list' %}" class="nav-link {% if rm.namespace == 'product' %}active{% endif %}">{% icon 'box' %} Produits</a>
+    {% if request.user|manager %}
+    <p class="px-3 pt-4 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Gestion</p>
+    <a href="{% url 'dashboard' %}" class="nav-link {% if rm.url_name == 'dashboard' %}active{% endif %}">{% icon 'dashboard' %} Tableau de bord</a>
+    <a href="{% url 'aprovision:reports' %}" class="nav-link {% if rm.url_name == 'reports' %}active{% endif %}">{% icon 'chart' %} Rapports</a>
+    <a href="{% url 'aprovision:depense_list' %}" class="nav-link {% if rm.url_name == 'depense_list' or rm.url_name == 'nouvelle_depense' %}active{% endif %}">{% icon 'wallet' %} Dépenses</a>
+    <a href="{% url 'aprovision:mouvement_list' %}" class="nav-link {% if rm.url_name == 'mouvement_list' %}active{% endif %}">{% icon 'layers' %} Mouvements de stock</a>
+    <a href="{% url 'users:user_list' %}" class="nav-link {% if rm.namespace == 'users' and rm.url_name != 'app_settings' and rm.url_name != 'my_password_change' %}active{% endif %}">{% icon 'user' %} Utilisateurs</a>
+    <a href="{% url 'users:app_settings' %}" class="nav-link {% if rm.url_name == 'app_settings' %}active{% endif %}">{% icon 'settings' %} Paramètres</a>
+    {% endif %}
+  </nav>
+  <div class="border-t border-navy-800 p-3">
+    <a href="{% url 'users:my_password_change' %}" class="nav-link">
+      <span class="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-navy-700 text-xs font-bold text-white">{{ request.user.first_name|default:request.user.username|slice:":1"|upper }}</span>
+      <span class="min-w-0 flex-1 truncate">{{ request.user.get_full_name|default:request.user.username }}</span>
+    </a>
+    <form method="post" action="{% url 'users:logout' %}">{% csrf_token %}
+      <button class="nav-link w-full">{% icon 'logout' %} Déconnexion</button>
+    </form>
+  </div>
+</aside>
+<div data-nav-backdrop class="fixed inset-0 z-30 hidden bg-black/50 lg:!hidden [.nav-open_&]:block"></div>
+{% endwith %}
+
+<div class="flex min-h-dvh flex-col lg:pl-60">
+  <header class="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-3 px-3 lg:hidden {% block topbar_class %}border-b border-slate-200 bg-white text-slate-900{% endblock %}">
+    <button type="button" data-toggle-nav class="rounded-lg p-2 hover:bg-black/5" aria-label="Menu">{% icon 'menu' 'h-6 w-6' %}</button>
+    <span class="truncate font-semibold">{% block topbar_title %}{{ company_name|default:"WELTO" }}{% endblock %}</span>
+    <div class="ml-auto flex items-center gap-2">{% block topbar_actions %}{% endblock %}</div>
+  </header>
+  <main class="{% block main_class %}mx-auto w-full max-w-6xl flex-1 p-4 lg:p-6{% endblock %}">
+    {% include 'partials/messages.html' %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+{% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+{% load welto %}
+{% block title %}Clients{% endblock %}
+{% block content %}
+<div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+  <h1 class="text-xl font-bold">Clients</h1>
+  <a href="{% url 'client:add_client' %}" class="btn btn-primary">{% icon 'plus' 'h-4 w-4' %} Nouveau client</a>
+</div>
+
+<div class="mb-4 grid gap-3 sm:grid-cols-[1fr_auto]">
+  <form method="get" class="card flex gap-2 p-3">
+    <input name="q" value="{{ q }}" class="input" placeholder="Nom ou téléphone">
+    <select name="status" class="input w-auto">
+      <option value="">Tous</option>
+      <option value="debt" {% if status == 'debt' %}selected{% endif %}>Avec dette</option>
+      <option value="inactive" {% if status == 'inactive' %}selected{% endif %}>Désactivés</option>
+    </select>
+    <button class="btn btn-dark">{% icon 'search' 'h-4 w-4' %}</button>
+  </form>
+  <div class="kpi"><p class="kpi-label">Total des crédits</p><p class="kpi-value {% if total_debt %}text-rose-700{% endif %}">{{ total_debt|money }} <span class="text-sm text-slate-500">{{ currency }}</span></p></div>
+</div>
+
+<div class="card overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="table">
+      <thead><tr><th>Client</th><th>Téléphone</th><th class="text-right">Achats</th><th class="text-right">Dette</th></tr></thead>
+      <tbody>
+      {% for c in page_obj %}
+        <tr class="cursor-pointer {% if not c.is_active %}opacity-60{% endif %}" onclick="location.href='{% url 'client:client_detail' c.pk %}'">
+          <td><a href="{% url 'client:client_detail' c.pk %}" class="font-semibold hover:underline">{{ c.name }}</a>{% if not c.is_active %} <span class="badge badge-gray">désactivé</span>{% endif %}</td>
+          <td class="num text-slate-600">{{ c.phone }}</td>
+          <td class="num text-right">{{ c.n_orders }}</td>
+          <td class="num text-right {% if c.debt %}font-semibold text-rose-700{% else %}text-slate-400{% endif %}">{{ c.debt|money }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="4" class="py-10 text-center text-slate-500">Aucun client.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include 'partials/pagination.html' %}
+</div>
+{% endblock %}

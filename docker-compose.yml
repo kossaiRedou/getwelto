@@ -1,0 +1,36 @@
+# Environnement complet en local, identique à la production :
+#   docker compose up --build    puis ouvrir http://localhost:8000
+# (En production, Coolify utilise le Dockerfile et sa propre base PostgreSQL.)
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: welto
+      POSTGRES_USER: welto
+      POSTGRES_PASSWORD: welto-dev
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U welto -d welto"]
+      interval: 5s
+      retries: 10
+
+  web:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://welto:welto-dev@db:5432/welto
+      SECRET_KEY: dev-uniquement-a-changer-en-production
+      DEBUG: "False"
+      ALLOWED_HOSTS: localhost,127.0.0.1
+      TIME_ZONE: Africa/Conakry
+    ports:
+      - "8000:8000"
+    volumes:
+      - welto_data:/data
+
+volumes:
+  pgdata:
+  welto_data:

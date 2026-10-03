@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+{% load welto %}
+{% block title %}Ventes{% endblock %}
+{% block content %}
+<div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+  <h1 class="text-xl font-bold">Ventes</h1>
+  <a href="{% url 'pos' %}" class="btn btn-primary">{% icon 'plus' 'h-4 w-4' %} Nouvelle vente</a>
+</div>
+
+<form method="get" class="card mb-4 grid gap-3 p-3 sm:grid-cols-2 lg:grid-cols-5">
+  <input name="q" value="{{ q }}" class="input lg:col-span-2" placeholder="N° de vente, client ou téléphone">
+  <input type="date" name="start" value="{{ start|date:'Y-m-d' }}" class="input" aria-label="Du">
+  <input type="date" name="end" value="{{ end|date:'Y-m-d' }}" class="input" aria-label="Au">
+  <div class="flex gap-2">
+    <select name="status" class="input">
+      <option value="">Toutes</option>
+      <option value="paid" {% if status == 'paid' %}selected{% endif %}>Payées</option>
+      <option value="unpaid" {% if status == 'unpaid' %}selected{% endif %}>Non soldées</option>
+    </select>
+    <button class="btn btn-dark">{% icon 'search' 'h-4 w-4' %}</button>
+  </div>
+</form>
+
+<div class="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+  <div class="kpi"><p class="kpi-label">Ventes</p><p class="kpi-value">{{ count }}</p></div>
+  <div class="kpi"><p class="kpi-label">Montant total</p><p class="kpi-value">{{ total|money }} <span class="text-sm text-slate-500">{{ currency }}</span></p></div>
+  <div class="kpi"><p class="kpi-label">Encaissé</p><p class="kpi-value text-emerald-700">{{ paid|money }}</p></div>
+  <div class="kpi"><p class="kpi-label">Reste dû</p><p class="kpi-value {% if remaining %}text-rose-700{% endif %}">{{ remaining|money }}</p></div>
+</div>
+
+<div class="card overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="table">
+      <thead><tr><th>N°</th><th>Date</th><th>Client</th><th class="text-right">Total</th><th class="text-right">Reste</th><th>Statut</th></tr></thead>
+      <tbody>
+      {% for o in page_obj %}
+        <tr class="cursor-pointer" onclick="location.href='{{ o.get_absolute_url }}'">
+          <td><a href="{{ o.get_absolute_url }}" class="font-semibold text-navy-800 hover:underline">{{ o.title }}</a></td>
+          <td class="num text-slate-600">{{ o.timestamp|date:"d/m/y H:i" }}</td>
+          <td class="max-w-48 truncate">{{ o.client.name|default:"—" }}</td>
+          <td class="num text-right font-semibold">{{ o.final_value|money }}</td>
+          <td class="num text-right {% if not o.is_paid %}font-semibold text-rose-700{% else %}text-slate-400{% endif %}">{{ o.remaining_amount|money }}</td>
+          <td>{% if o.is_paid %}<span class="badge badge-green">Payée</span>{% elif o.amount_paid %}<span class="badge badge-amber">Partiel</span>{% else %}<span class="badge badge-red">Crédit</span>{% endif %}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6" class="py-10 text-center text-slate-500">Aucune vente.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include 'partials/pagination.html' %}
+</div>
+{% endblock %}

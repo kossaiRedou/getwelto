@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% load welto %}
+{% block title %}Catégories{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-2xl">
+  <div class="mb-4 flex items-center gap-3">
+    <a href="{% url 'product:product_list' %}" class="btn btn-ghost px-2" aria-label="Retour">{% icon 'back' %}</a>
+    <h1 class="text-xl font-bold">Catégories</h1>
+  </div>
+  <form method="post" class="card mb-4 flex items-end gap-2 p-4">{% csrf_token %}
+    {% include 'partials/field.html' with field=form.title class='flex-1' %}
+    <button class="btn btn-primary">{% icon 'plus' 'h-4 w-4' %} Créer</button>
+  </form>
+  <div class="card divide-y divide-slate-100">
+    {% for c in categories %}
+    <div class="flex items-center gap-3 px-4 py-3">
+      <span class="font-medium">{{ c.title }}</span>
+      <a href="{% url 'product:product_list' %}?category={{ c.pk }}" class="text-sm text-slate-500 hover:underline">{{ c.n }} produit{{ c.n|pluralize }}</a>
+      <form method="post" action="{% url 'product:delete_category' c.pk %}" class="ml-auto" data-confirm="Supprimer la catégorie « {{ c.title }} » ? Ses produits sont conservés.">{% csrf_token %}
+        <button class="rounded p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600" aria-label="Supprimer">{% icon 'trash' 'h-4 w-4' %}</button>
+      </form>
+    </div>
+    {% empty %}<p class="px-4 py-6 text-center text-slate-500">Aucune catégorie.</p>{% endfor %}
+  </div>
+</div>
+{% endblock %}

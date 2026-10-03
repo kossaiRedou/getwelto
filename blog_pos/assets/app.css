@@ -1,0 +1,86 @@
+/*
+ * Source Tailwind de WELTO. Compilée vers core/static/css/app.css :
+ *   tailwindcss -i assets/app.css -o core/static/css/app.css --minify
+ * (fait automatiquement par le Dockerfile ; voir README pour le développement).
+ */
+@import "tailwindcss" source(none);
+
+@source "../core/templates";
+@source "../order/templates/order";
+@source "../product/templates";
+@source "../client/templates/client";
+@source "../aprovision/templates/aprovision";
+@source "../users/templates/users";
+@source "../core/static/js";
+@source "../**/forms.py";
+@source "../core/templatetags";
+
+@theme {
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --color-navy-950: #0a1322;
+  --color-navy-900: #0f1b2d;
+  --color-navy-800: #172a45;
+  --color-navy-700: #22395c;
+  --color-navy-600: #34507a;
+}
+
+@layer base {
+  html { -webkit-tap-highlight-color: transparent; }
+  body { @apply bg-slate-100 text-slate-900 antialiased; }
+  [x-cloak], [hidden] { display: none !important; }
+  input[type=number]::-webkit-inner-spin-button,
+  input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type=number] { -moz-appearance: textfield; }
+}
+
+@layer components {
+  .input {
+    @apply block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-base text-slate-900
+      placeholder:text-slate-400 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30
+      disabled:bg-slate-100 disabled:text-slate-500;
+  }
+  .checkbox { @apply h-5 w-5 rounded border-slate-300 accent-amber-500; }
+  .file-input {
+    @apply block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-200
+      file:px-3 file:py-2 file:font-semibold file:text-slate-800;
+  }
+  .label { @apply mb-1 block text-sm font-medium text-slate-700; }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold
+      transition-colors select-none disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary { @apply bg-amber-500 text-navy-950 hover:bg-amber-400; }
+  .btn-dark { @apply bg-navy-900 text-white hover:bg-navy-800; }
+  .btn-light { @apply border border-slate-300 bg-white text-slate-700 hover:bg-slate-50; }
+  .btn-danger { @apply bg-rose-600 text-white hover:bg-rose-500; }
+  .btn-ghost { @apply text-slate-600 hover:bg-slate-200; }
+  .btn-sm { @apply px-3 py-1.5 text-xs; }
+  .card { @apply rounded-xl border border-slate-200 bg-white shadow-sm; }
+  .badge { @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold; }
+  .badge-green { @apply bg-emerald-100 text-emerald-800; }
+  .badge-red { @apply bg-rose-100 text-rose-800; }
+  .badge-amber { @apply bg-amber-100 text-amber-800; }
+  .badge-gray { @apply bg-slate-100 text-slate-700; }
+  .table { @apply w-full text-left text-sm; }
+  .table th { @apply bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500; }
+  .table td { @apply border-t border-slate-100 px-3 py-2.5 align-middle; }
+  .table tbody tr:hover { @apply bg-slate-50; }
+  .nav-link {
+    @apply flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-300
+      hover:bg-navy-800 hover:text-white;
+  }
+  .nav-link.active { @apply bg-amber-500 text-navy-950; }
+  .kpi { @apply rounded-xl border border-slate-200 bg-white p-4 shadow-sm; }
+  .kpi-label { @apply text-xs font-semibold uppercase tracking-wide text-slate-500; }
+  .kpi-value { @apply mt-1 text-2xl font-bold tabular-nums text-slate-900; }
+  .num { @apply tabular-nums whitespace-nowrap; }
+
+  /* Caisse */
+  .method {
+    @apply flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-navy-600 px-1 py-2.5
+      text-xs font-semibold leading-tight text-slate-300 hover:bg-navy-800;
+  }
+  .method.selected { @apply border-amber-500 bg-amber-500/10 text-amber-300; }
+  .qbtn { @apply rounded-lg bg-navy-800 px-3 py-1.5 text-sm font-semibold text-slate-200 tabular-nums hover:bg-navy-700; }
+  .step { @apply grid h-10 w-10 place-items-center rounded-lg bg-navy-700 text-white hover:bg-navy-600 active:bg-amber-500 active:text-navy-950; }
+}

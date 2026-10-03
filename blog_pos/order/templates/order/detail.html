@@ -1,0 +1,105 @@
+{% extends 'base.html' %}
+{% load welto %}
+{% block title %}Vente {{ order.title }}{% endblock %}
+{% block content %}
+<div class="mb-4 flex flex-wrap items-center gap-3">
+  <a href="{% url 'order_list' %}" class="btn btn-ghost px-2" aria-label="Retour">{% icon 'back' %}</a>
+  <h1 class="text-xl font-bold">Vente {{ order.title }}</h1>
+  {% if order.is_paid %}<span class="badge badge-green">Payée</span>{% elif order.amount_paid %}<span class="badge badge-amber">Partiellement payée</span>{% else %}<span class="badge badge-red">À crédit</span>{% endif %}
+  <div class="ml-auto flex flex-wrap gap-2">
+    <a href="{% url 'order_ticket' order.pk %}?print=1" target="_blank" rel="noopener" class="btn btn-light">{% icon 'printer' 'h-4 w-4' %} Ticket</a>
+    <a href="{% url 'invoice_pdf' order.pk %}" class="btn btn-light">{% icon 'download' 'h-4 w-4' %} Facture PDF</a>
+  </div>
+</div>
+
+<div class="grid gap-4 lg:grid-cols-3">
+  <div class="space-y-4 lg:col-span-2">
+    <div class="card overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="table">
+          <thead><tr><th>Produit</th><th class="text-right">Qté</th><th class="text-right">Prix</th><th class="text-right">Total</th></tr></thead>
+          <tbody>
+          {% for it in items %}
+            <tr>
+              <td>{{ it.product.title }}{% if it.discount_price and it.discount_price < it.price %} <span class="badge badge-amber">promo</span>{% endif %}</td>
+              <td class="num text-right">{{ it.qty }}</td>
+              <td class="num text-right">{{ it.final_price|money }}</td>
+              <td class="num text-right font-semibold">{{ it.total_price|money }}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+          <tfoot class="text-sm">
+            {% if order.discount %}
+            <tr><td colspan="3" class="px-3 py-1.5 text-right text-slate-500">Sous-total</td><td class="num px-3 text-right">{{ order.value|money }}</td></tr>
+            <tr><td colspan="3" class="px-3 py-1.5 text-right text-slate-500">Remise</td><td class="num px-3 text-right">−{{ order.discount|money }}</td></tr>
+            {% endif %}
+            <tr class="border-t border-slate-200"><td colspan="3" class="px-3 py-2 text-right font-bold">Total</td><td class="num px-3 text-right text-lg font-bold">{{ order.final_value|money }} {{ currency }}</td></tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    <div class="card p-4">
+      <h2 class="mb-3 font-semibold">Paiements</h2>
+      {% if payments %}
+      <ul class="divide-y divide-slate-100">
+        {% for p in payments %}
+        <li class="flex items-center gap-3 py-2 text-sm">
+          <span class="num text-slate-500">{{ p.date|date:"d/m/Y" }}</span>
+          <span class="badge badge-gray">{{ p.get_method_display }}</span>
+          <span class="truncate text-slate-500">{{ p.note }}</span>
+          <span class="num ml-auto font-semibold">{{ p.amount|money }}</span>
+          {% if request.user|manager %}
+          <form method="post" action="{% url 'order_delete_payment' order.pk p.pk %}" data-confirm="Supprimer ce paiement de {{ p.amount|money }} ?">{% csrf_token %}
+            <button class="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600" aria-label="Supprimer">{% icon 'trash' 'h-4 w-4' %}</button>
+          </form>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="text-sm text-slate-500">Aucun paiement.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="space-y-4">
+    <div class="card space-y-2 p-4 text-sm">
+      <div class="flex justify-between"><span class="text-slate-500">Date</span><span>{{ order.timestamp|date:"d/m/Y H:i" }}</span></div>
+      <div class="flex justify-between"><span class="text-slate-500">Vendeur</span><span>{{ order.created_by.get_full_name|default:order.created_by.username|default:"—" }}</span></div>
+      <div class="flex justify-between"><span class="text-slate-500">Client</span>
+        {% if client %}<a href="{% url 'client:client_detail' client.pk %}" class="font-semibold text-navy-800 hover:underline">{{ client.name }}</a>{% else %}<span>Comptoir</span>{% endif %}</div>
+      <hr class="border-slate-100">
+      <div class="flex justify-between"><span class="text-slate-500">Total</span><span class="num font-semibold">{{ order.final_value|money }}</span></div>
+      <div class="flex justify-between"><span class="text-slate-500">Payé</span><span class="num text-emerald-700">{{ order.amount_paid|money }}</span></div>
+      <div class="flex justify-between text-base"><span class="font-semibold">Reste dû</span><span class="num font-bold {% if not order.is_paid %}text-rose-700{% endif %}">{{ order.remaining_amount|money }} {{ currency }}</span></div>
+    </div>
+
+    {% if not order.is_paid %}
+    <form method="post" action="{% url 'order_add_payment' order.pk %}" class="card space-y-3 p-4">{% csrf_token %}
+      <h2 class="font-semibold">Encaisser</h2>
+      <div>
+        <label class="label" for="pay-amount">Montant</label>
+        <input id="pay-amount" name="amount" class="input text-right text-lg font-semibold" inputmode="decimal" required
+               value="{{ order.remaining_amount|stringformat:'s' }}" autocomplete="off">
+        <p class="mt-1 text-xs text-slate-500">Maximum : {{ order.remaining_amount|money }} {{ currency }}</p>
+      </div>
+      <div>
+        <label class="label" for="pay-method">Mode</label>
+        <select id="pay-method" name="method" class="input">{% for value, label in methods %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select>
+      </div>
+      <input name="note" class="input" placeholder="Note (optionnel)" maxlength="200">
+      <button class="btn btn-primary w-full py-3">{% icon 'check' 'h-4 w-4' %} Enregistrer le paiement</button>
+    </form>
+    {% endif %}
+
+    {% if request.user|manager %}
+    <form method="post" action="{% url 'order_cancel' order.pk %}" class="card p-4"
+          data-confirm="Annuler la vente {{ order.title }} ? Les articles seront remis en stock{% if order.amount_paid %} et {{ order.amount_paid|money }} {{ currency }} déjà encaissés seront à rembourser{% endif %}.">{% csrf_token %}
+      <p class="mb-3 text-sm text-slate-500">Erreur de caisse ? L'annulation remet les articles en stock (tracé dans les mouvements).</p>
+      <button class="btn btn-danger w-full">{% icon 'trash' 'h-4 w-4' %} Annuler la vente</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

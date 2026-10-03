@@ -1,0 +1,27 @@
+{% extends 'base_auth.html' %}
+{% block title %}Bienvenue{% endblock %}
+{% block width %}max-w-xl{% endblock %}
+{% block content %}
+<h1 class="text-lg font-bold">Bienvenue sur WELTO</h1>
+<p class="mb-5 text-sm text-slate-500">Configurez votre boutique et créez le compte du gérant (manager).</p>
+<form method="post" class="space-y-4">{% csrf_token %}
+  {% include 'partials/form_errors.html' %}
+  <div class="grid gap-4 sm:grid-cols-2">
+    {% include 'partials/field.html' with field=form.company_name %}
+    {% include 'partials/field.html' with field=form.currency_label %}
+  </div>
+  <hr class="border-slate-100">
+  <div class="grid gap-4 sm:grid-cols-2">
+    {% include 'partials/field.html' with field=form.first_name %}
+    {% include 'partials/field.html' with field=form.last_name %}
+    {% include 'partials/field.html' with field=form.username %}
+    {% include 'partials/field.html' with field=form.phone %}
+  </div>
+  {% include 'partials/field.html' with field=form.email %}
+  <div class="grid gap-4 sm:grid-cols-2">
+    {% include 'partials/field.html' with field=form.password1 %}
+    {% include 'partials/field.html' with field=form.password2 %}
+  </div>
+  <button class="btn btn-primary w-full py-3 text-base">Créer ma boutique</button>
+</form>
+{% endblock %}

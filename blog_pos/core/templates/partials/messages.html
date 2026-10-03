@@ -1,0 +1,8 @@
+{% if messages %}
+<div class="mb-4 space-y-2">
+  {% for m in messages %}
+  <div role="status" {% if m.level_tag == 'success' %}data-autohide{% endif %}
+       class="rounded-lg px-4 py-3 text-sm font-medium ring-1 {% if m.level_tag == 'error' %}bg-rose-50 text-rose-800 ring-rose-200{% elif m.level_tag == 'success' %}bg-emerald-50 text-emerald-800 ring-emerald-200{% elif m.level_tag == 'warning' %}bg-amber-50 text-amber-900 ring-amber-200{% else %}bg-sky-50 text-sky-800 ring-sky-200{% endif %}">{{ m }}</div>
+  {% endfor %}
+</div>
+{% endif %}

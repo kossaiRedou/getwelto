@@ -1,0 +1,17 @@
+{% extends 'base_auth.html' %}
+{% block title %}Connexion{% endblock %}
+{% block content %}
+<h1 class="mb-4 text-lg font-bold">Connexion</h1>
+<form method="post" class="space-y-4">{% csrf_token %}
+  <div>
+    <label for="id_username" class="label">Identifiant</label>
+    <input id="id_username" name="username" value="{{ username }}" class="input" autocomplete="username" autocapitalize="none" required autofocus>
+  </div>
+  <div>
+    <label for="id_password" class="label">Mot de passe</label>
+    <input id="id_password" name="password" type="password" class="input" autocomplete="current-password" required>
+  </div>
+  <button class="btn btn-primary w-full py-3 text-base">Se connecter</button>
+</form>
+<p class="mt-4 text-center text-sm"><a href="{% url 'users:forgot_password' %}" class="text-slate-500 hover:underline">Mot de passe oublié ?</a></p>
+{% endblock %}

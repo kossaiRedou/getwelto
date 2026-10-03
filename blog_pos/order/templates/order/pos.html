@@ -1,0 +1,144 @@
+{% extends 'base.html' %}
+{% load static welto %}
+{% block title %}Caisse{% endblock %}
+{% block body_class %}bg-navy-950 overscroll-none{% endblock %}
+{% block topbar_class %}bg-navy-900 text-white{% endblock %}
+{% block topbar_title %}Caisse{% endblock %}
+{% block topbar_actions %}<span id="net-status" class="hidden rounded-full bg-rose-600 px-2 py-0.5 text-xs font-semibold text-white">Hors ligne</span>{% endblock %}
+{% block main_class %}flex min-h-0 flex-1 flex-col{% endblock %}
+
+{% block content %}
+<div id="pos" class="flex h-[calc(100dvh-3.5rem)] flex-col lg:h-dvh lg:flex-row"
+     data-catalog-url="{% url 'api_catalog' %}"
+     data-checkout-url="{% url 'api_checkout' %}"
+     data-client-search-url="{% url 'client:api_search' %}"
+     data-client-create-url="{% url 'client:api_create' %}"
+     data-login-url="{% url 'users:login' %}"
+     data-currency="{{ currency }}">
+
+  {# ------------------------------------------------ Recherche / produits #}
+  <section class="flex min-h-0 flex-col lg:flex-1 [.searching_&]:flex-1">
+    <div class="p-3 pb-2">
+      <label class="relative block">
+        <span class="pointer-events-none absolute inset-y-0 left-4 flex items-center text-slate-400">{% icon 'scan' 'h-6 w-6' %}</span>
+        <input id="search" type="search" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="go"
+               placeholder="Scanner ou rechercher produit"
+               class="w-full rounded-xl border-2 border-amber-500/70 bg-navy-900 py-3.5 pl-13 pr-4 text-lg text-white placeholder:text-slate-400 focus:border-amber-400 focus:outline-none">
+      </label>
+      <div id="cats" class="mt-2 hidden gap-2 overflow-x-auto pb-1 lg:flex [.searching_&]:flex"></div>
+    </div>
+    <div id="results" class="hidden min-h-0 flex-1 overflow-y-auto px-3 pb-3 lg:block [.searching_&]:block"></div>
+  </section>
+
+  {# ------------------------------------------------ Panier + encaissement #}
+  <section class="flex min-h-0 flex-1 flex-col bg-navy-900 lg:w-[430px] lg:flex-none lg:border-l lg:border-navy-800 [.searching_&]:hidden lg:[.searching_&]:flex">
+    <div class="flex items-center justify-between px-4 pt-3 text-sm">
+      <span class="font-semibold text-slate-300">Panier <span id="cart-count" class="text-slate-500"></span></span>
+      <button id="cart-clear" type="button" class="hidden rounded-lg px-2 py-1 text-slate-400 hover:bg-navy-800 hover:text-white">Vider</button>
+    </div>
+    <ul id="cart" class="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-2"></ul>
+    <div id="cart-empty" class="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center text-slate-500">
+      {% icon 'cart' 'h-10 w-10' %}
+      <p>Scannez ou recherchez un produit pour commencer la vente.</p>
+    </div>
+
+    <div class="space-y-3 border-t border-navy-700 p-3 pb-[max(.75rem,env(safe-area-inset-bottom))]">
+      <div class="flex flex-wrap items-center gap-2">
+        <button id="client-btn" type="button" class="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-navy-600 px-3 py-2 text-left text-sm text-slate-200 hover:bg-navy-800">
+          {% icon 'user' 'h-4 w-4 shrink-0' %}<span id="client-label" class="truncate">Client comptoir</span>
+        </button>
+        <button id="discount-btn" type="button" class="flex items-center gap-1.5 rounded-lg border border-navy-600 px-3 py-2 text-sm text-slate-200 hover:bg-navy-800">
+          {% icon 'tag' 'h-4 w-4' %}<span id="discount-label">Remise</span>
+        </button>
+      </div>
+      <div id="discount-row" hidden>
+        <label class="flex items-center gap-2 text-sm text-slate-300">Remise
+          <input id="discount" inputmode="decimal" autocomplete="off" placeholder="0"
+                 class="w-full rounded-lg border border-navy-600 bg-navy-950 px-3 py-2 text-right text-white focus:border-amber-400 focus:outline-none">
+          <span class="text-slate-400">{{ currency }}</span>
+        </label>
+      </div>
+
+      <div class="flex items-end justify-between border-t border-amber-500/60 pt-2">
+        <span class="text-lg font-bold tracking-wide text-white">TOTAL</span>
+        <span class="text-right">
+          <span id="subtotal" class="block text-xs text-slate-400 line-through" hidden></span>
+          <span class="text-3xl font-black tabular-nums text-white"><span id="total">0</span> <span class="text-xl">{{ currency }}</span></span>
+        </span>
+      </div>
+
+      <div id="methods" class="grid grid-cols-4 gap-2">
+        <button type="button" data-method="cash" class="method">{% icon 'cash' 'h-5 w-5' %}<span>Espèces</span></button>
+        <button type="button" data-method="mobile" class="method">{% icon 'phone' 'h-5 w-5' %}<span>Mobile Money</span></button>
+        <button type="button" data-method="card" class="method">{% icon 'card' 'h-5 w-5' %}<span>Carte</span></button>
+        <button type="button" data-method="credit" class="method">{% icon 'clock' 'h-5 w-5' %}<span>Crédit</span></button>
+      </div>
+
+      <div id="amount-row" class="space-y-2">
+        <label class="flex items-center gap-2 text-sm text-slate-300">
+          <span id="amount-label" class="w-32 shrink-0">Montant reçu</span>
+          <input id="amount" inputmode="decimal" autocomplete="off"
+                 class="w-full rounded-lg border border-navy-600 bg-navy-950 px-3 py-2.5 text-right text-lg font-semibold text-white placeholder:text-slate-500 focus:border-amber-400 focus:outline-none">
+        </label>
+        <div id="quick" class="flex flex-wrap gap-2"></div>
+        <p id="amount-info" class="min-h-5 text-right text-sm font-semibold"></p>
+      </div>
+
+      <button id="validate" type="button" disabled
+              class="w-full rounded-xl bg-amber-500 py-4 text-lg font-black tracking-wide text-navy-950 shadow-lg shadow-amber-500/20 transition hover:bg-amber-400 disabled:bg-navy-700 disabled:text-slate-500 disabled:shadow-none">
+        VALIDER LA VENTE
+      </button>
+    </div>
+  </section>
+</div>
+
+{# ------------------------------------------------ Choix du client #}
+<div id="client-modal" hidden class="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center">
+  <div class="flex max-h-[90dvh] w-full max-w-md flex-col rounded-t-2xl bg-white sm:rounded-2xl">
+    <div class="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+      <h2 class="font-bold">Client</h2>
+      <button type="button" data-close class="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100" aria-label="Fermer">{% icon 'x' %}</button>
+    </div>
+    <div class="space-y-3 overflow-y-auto p-4">
+      <p id="client-hint" hidden class="rounded-lg bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900 ring-1 ring-amber-200"></p>
+      <input id="client-q" type="search" class="input" placeholder="Nom ou téléphone" autocomplete="off">
+      <div id="client-results" class="divide-y divide-slate-100"></div>
+      <button id="client-remove" type="button" hidden class="btn btn-light w-full">Vente sans client (comptoir)</button>
+      <details id="client-new" class="rounded-xl border border-slate-200 p-3">
+        <summary class="cursor-pointer text-sm font-semibold text-slate-700">+ Nouveau client</summary>
+        <form id="client-form" class="mt-3 space-y-2">
+          <input name="name" class="input" placeholder="Nom" required autocomplete="off">
+          <input name="phone" class="input" placeholder="Téléphone" inputmode="tel" required autocomplete="off">
+          <p id="client-error" class="text-sm font-medium text-rose-600"></p>
+          <button class="btn btn-dark w-full">Créer et choisir</button>
+        </form>
+      </details>
+    </div>
+  </div>
+</div>
+
+{# ------------------------------------------------ Vente enregistrée #}
+<div id="done" hidden class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+  <div class="w-full max-w-sm rounded-2xl bg-white p-6 text-center">
+    <div class="mx-auto grid h-14 w-14 place-items-center rounded-full bg-emerald-100 text-emerald-600">{% icon 'check' 'h-8 w-8' %}</div>
+    <p class="mt-3 text-lg font-bold">Vente <span id="done-number"></span> enregistrée</p>
+    <p class="text-slate-500">Total <b id="done-total" class="text-slate-900"></b> {{ currency }}</p>
+    <div id="done-change" hidden class="mt-4 rounded-xl bg-amber-50 p-3 ring-1 ring-amber-200">
+      <p class="text-sm font-semibold text-amber-900">Monnaie à rendre</p>
+      <p class="text-3xl font-black tabular-nums text-amber-950"><span></span> {{ currency }}</p>
+    </div>
+    <div id="done-debt" hidden class="mt-4 rounded-xl bg-rose-50 p-3 text-sm font-semibold text-rose-800 ring-1 ring-rose-200"></div>
+    <div class="mt-5 grid gap-2">
+      <button id="done-new" type="button" class="btn btn-primary py-3.5 text-base">Nouvelle vente</button>
+      <div class="grid grid-cols-2 gap-2">
+        <a id="done-ticket" href="#" target="_blank" rel="noopener" class="btn btn-light">{% icon 'printer' 'h-4 w-4' %} Ticket</a>
+        <a id="done-detail" href="#" class="btn btn-light">{% icon 'eye' 'h-4 w-4' %} Détail</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" hidden class="fixed inset-x-3 top-16 z-[60] mx-auto max-w-md rounded-xl px-4 py-3 text-sm font-semibold shadow-xl lg:top-4"></div>
+{% endblock %}
+
+{% block scripts %}<script src="{% static 'js/caisse.js' %}" defer></script>{% endblock %}

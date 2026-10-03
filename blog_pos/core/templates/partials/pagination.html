@@ -1,0 +1,12 @@
+{% load welto %}
+{% if page_obj.has_other_pages %}
+<nav class="flex items-center justify-between gap-3 border-t border-slate-100 px-3 py-3 text-sm">
+  {% if page_obj.has_previous %}
+  <a class="btn btn-light btn-sm" href="?{% query_transform page=page_obj.previous_page_number %}">← Précédent</a>
+  {% else %}<span></span>{% endif %}
+  <span class="text-slate-500">Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+  {% if page_obj.has_next %}
+  <a class="btn btn-light btn-sm" href="?{% query_transform page=page_obj.next_page_number %}">Suivant →</a>
+  {% else %}<span></span>{% endif %}
+</nav>
+{% endif %}

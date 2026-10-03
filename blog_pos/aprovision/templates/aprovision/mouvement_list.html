@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% load welto %}
+{% block title %}Mouvements de stock{% endblock %}
+{% block content %}
+<h1 class="mb-4 text-xl font-bold">Mouvements de stock</h1>
+
+<form method="get" class="card mb-4 grid gap-3 p-3 sm:grid-cols-2 lg:grid-cols-5">
+  <select name="product" class="input lg:col-span-2">
+    <option value="">Tous les produits</option>
+    {% for pid, title in products %}<option value="{{ pid }}" {% if product_id == pid|stringformat:'s' %}selected{% endif %}>{{ title }}</option>{% endfor %}
+  </select>
+  <select name="type" class="input">
+    <option value="">Tous les types</option>
+    {% for value, label in types %}<option value="{{ value }}" {% if kind == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select>
+  <input type="date" name="start" value="{{ start|date:'Y-m-d' }}" class="input" aria-label="Du">
+  <div class="flex gap-2">
+    <input type="date" name="end" value="{{ end|date:'Y-m-d' }}" class="input" aria-label="Au">
+    <button class="btn btn-dark">{% icon 'search' 'h-4 w-4' %}</button>
+  </div>
+</form>
+
+<div class="card overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="table">
+      <thead><tr><th>Date</th><th>Produit</th><th>Type</th><th class="text-right">Qté</th><th class="text-right">Avant → Après</th><th class="text-right">Coût</th><th>Par</th></tr></thead>
+      <tbody>
+      {% for m in page_obj %}
+        <tr>
+          <td class="num text-slate-500">{{ m.date_mouvement|date:"d/m/y H:i" }}</td>
+          <td class="font-medium">{{ m.produit.title }}</td>
+          <td>{{ m.get_type_mouvement_display }}<span class="block text-xs text-slate-400">{% if m.reference_commande %}<a href="{{ m.reference_commande.get_absolute_url }}" class="hover:underline">{{ m.description }}</a>{% else %}{{ m.description }}{% endif %}</span></td>
+          <td class="num text-right font-semibold {% if m.quantite > 0 %}text-emerald-700{% else %}text-rose-700{% endif %}">{% if m.quantite > 0 %}+{% endif %}{{ m.quantite }}</td>
+          <td class="num text-right text-slate-500">{{ m.stock_avant }} → {{ m.stock_apres }}</td>
+          <td class="num text-right text-slate-500">{% if m.cout_total %}{{ m.cout_total|money }}{% else %}—{% endif %}</td>
+          <td class="text-slate-500">{{ m.created_by.first_name|default:m.created_by.username|default:"—" }}</td>
+        </tr>
+      {% empty %}<tr><td colspan="7" class="py-10 text-center text-slate-500">Aucun mouvement.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include 'partials/pagination.html' %}
+</div>
+{% endblock %}

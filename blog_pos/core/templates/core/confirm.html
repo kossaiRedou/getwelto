@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="card mx-auto max-w-md p-6">
+  <h1 class="text-lg font-bold">{{ title }}</h1>
+  <p class="mt-2 text-slate-600">{{ message }}</p>
+  <form method="post" class="mt-6 flex justify-end gap-2">{% csrf_token %}
+    <a href="{% url cancel_url %}" class="btn btn-light">Annuler</a>
+    <button class="btn btn-danger">Confirmer</button>
+  </form>
+</div>
+{% endblock %}

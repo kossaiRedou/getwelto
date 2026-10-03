@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% load welto %}
+{% block title %}Stock · {{ product.title }}{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-3xl">
+  <div class="mb-4 flex items-center gap-3">
+    <a href="{% url 'product:product_list' %}" class="btn btn-ghost px-2" aria-label="Retour">{% icon 'back' %}</a>
+    <h1 class="min-w-0 truncate text-xl font-bold">{{ product.title }}</h1>
+    <span class="badge ml-auto {% if product.qty == 0 %}badge-red{% else %}badge-green{% endif %} text-sm">Stock : {{ product.qty }}</span>
+  </div>
+
+  <form method="post" class="card space-y-4 p-5">{% csrf_token %}
+    {% include 'partials/form_errors.html' %}
+    <div class="grid gap-4 sm:grid-cols-2">
+      {% include 'partials/field.html' with field=form.action %}
+      {% include 'partials/field.html' with field=form.quantity %}
+      {% include 'partials/field.html' with field=form.unit_cost class='restock-only' %}
+      {% include 'partials/field.html' with field=form.fournisseur class='restock-only' %}
+    </div>
+    {% include 'partials/field.html' with field=form.description %}
+    <p class="rounded-lg bg-slate-50 p-3 text-sm text-slate-600">
+      <b>Approvisionnement</b> : ajoute au stock et enregistre la dépense d'achat.
+      <b>Inventaire</b> : saisissez la quantité comptée en rayon, l'écart est enregistré.
+    </p>
+    <div class="flex justify-end"><button class="btn btn-primary">{% icon 'check' 'h-4 w-4' %} Valider</button></div>
+  </form>
+
+  <div class="card mt-4 overflow-hidden">
+    <h2 class="px-4 pt-4 font-semibold">Derniers mouvements</h2>
+    <div class="overflow-x-auto">
+      <table class="table mt-2">
+        <thead><tr><th>Date</th><th>Type</th><th class="text-right">Qté</th><th class="text-right">Avant → Après</th><th>Par</th></tr></thead>
+        <tbody>
+        {% for m in movements %}
+          <tr>
+            <td class="num text-slate-500">{{ m.date_mouvement|date:"d/m/y H:i" }}</td>
+            <td>{{ m.get_type_mouvement_display }}<span class="block text-xs text-slate-400">{{ m.description }}</span></td>
+            <td class="num text-right font-semibold {% if m.quantite > 0 %}text-emerald-700{% else %}text-rose-700{% endif %}">{% if m.quantite > 0 %}+{% endif %}{{ m.quantite }}</td>
+            <td class="num text-right text-slate-500">{{ m.stock_avant }} → {{ m.stock_apres }}</td>
+            <td class="text-slate-500">{{ m.created_by.first_name|default:m.created_by.username|default:"—" }}</td>
+          </tr>
+        {% empty %}<tr><td colspan="5" class="py-6 text-center text-slate-500">Aucun mouvement.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<script>
+  (function () {
+    var action = document.getElementById('{{ form.action.id_for_label }}');
+    function sync() {
+      document.querySelectorAll('.restock-only').forEach(function (el) { el.hidden = action.value !== 'restock'; });
+    }
+    action.addEventListener('change', sync);
+    sync();
+  })();
+</script>
+{% endblock %}

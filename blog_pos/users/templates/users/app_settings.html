@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% load welto %}
+{% block title %}Paramètres{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-2xl">
+  <h1 class="mb-4 text-xl font-bold">Paramètres</h1>
+  <form method="post" enctype="multipart/form-data" class="space-y-4">{% csrf_token %}
+    {% include 'partials/form_errors.html' %}
+    <div class="card space-y-4 p-5">
+      <h2 class="font-semibold">Boutique</h2>
+      <div class="grid gap-4 sm:grid-cols-2">
+        {% include 'partials/field.html' with field=form.company_name %}
+        {% include 'partials/field.html' with field=form.company_tagline %}
+        {% include 'partials/field.html' with field=form.currency_label %}
+        {% include 'partials/field.html' with field=form.low_stock_threshold %}
+      </div>
+    </div>
+    <div class="card space-y-4 p-5">
+      <h2 class="font-semibold">Factures et tickets</h2>
+      {% include 'partials/field.html' with field=form.company_logo %}
+      <div class="grid gap-4 sm:grid-cols-2">
+        {% include 'partials/field.html' with field=form.brand_color_primary %}
+        {% include 'partials/field.html' with field=form.signatory_name %}
+        {% include 'partials/field.html' with field=form.signature_image %}
+        {% include 'partials/field.html' with field=form.stamp_image %}
+      </div>
+    </div>
+    <div class="flex justify-end"><button class="btn btn-primary">{% icon 'check' 'h-4 w-4' %} Enregistrer</button></div>
+  </form>
+</div>
+{% endblock %}

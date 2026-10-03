@@ -1,0 +1,483 @@
+{% load welto %}<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8"/>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <title>Facture - {{ order.title }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 1cm 1.5cm;
+        }
+
+        body {
+            font-family: DejaVu Sans, Arial, sans-serif;
+            font-size: 10px;
+            color: #333;
+            line-height: 1.3;
+        }
+
+        /* --- Header --- */
+        .header-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 8px;
+        }
+
+        .header-table td {
+            border: none;
+            padding: 0;
+            vertical-align: middle;
+        }
+
+        .company-name {
+            font-size: 14px;
+            font-weight: bold;
+            color: {{ app_settings.brand_color_primary|default:'#2c5aa0' }};
+            margin: 0;
+        }
+
+        .company-info {
+            font-size: 9px;
+            color: #777;
+        }
+
+        /* --- Facture title --- */
+        .invoice-title-bar {
+            background-color: {{ app_settings.brand_color_primary|default:'#2c5aa0' }};
+            color: white;
+            padding: 5px 12px;
+            margin-bottom: 8px;
+        }
+
+        .invoice-title-bar h1 {
+            margin: 0;
+            font-size: 14px;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        /* --- Info blocks --- */
+        .info-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 10px;
+        }
+
+        .info-table td {
+            border: none;
+            padding: 0;
+            vertical-align: top;
+            width: 50%;
+        }
+
+        .info-block {
+            padding: 5px 8px;
+            background-color: #f8f9fa;
+            border-left: 2px solid {{ app_settings.brand_color_primary|default:'#2c5aa0' }};
+        }
+
+        .info-block-title {
+            font-size: 8px;
+            font-weight: bold;
+            color: {{ app_settings.brand_color_primary|default:'#2c5aa0' }};
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 2px;
+        }
+
+        .info-block div {
+            margin-bottom: 1px;
+            font-size: 9px;
+        }
+
+        /* --- Products table --- */
+        .products-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 8px;
+        }
+
+        .products-table thead th {
+            background-color: {{ app_settings.brand_color_primary|default:'#2c5aa0' }};
+            color: white;
+            padding: 5px 8px;
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            border: none;
+        }
+
+        .products-table thead th:first-child {
+            text-align: left;
+        }
+
+        .products-table tbody td {
+            padding: 4px 8px;
+            border-bottom: 1px solid #e9ecef;
+            font-size: 10px;
+        }
+
+        .products-table tbody tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .text-left { text-align: left; }
+
+        /* --- Totals --- */
+        .totals-wrapper {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 10px;
+        }
+
+        .totals-wrapper td {
+            border: none;
+            padding: 0;
+            vertical-align: top;
+        }
+
+        .totals-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .totals-table td {
+            padding: 3px 8px;
+            border: none;
+            font-size: 10px;
+        }
+
+        .totals-table .total-row td {
+            font-weight: bold;
+            font-size: 11px;
+            border-top: 2px solid {{ app_settings.brand_color_primary|default:'#2c5aa0' }};
+            padding-top: 5px;
+            color: {{ app_settings.brand_color_primary|default:'#2c5aa0' }};
+        }
+
+        .totals-table .paid-row td {
+            color: {{ app_settings.brand_color_secondary|default:'#198754' }};
+        }
+
+        .totals-table .remaining-row td {
+            color: {{ app_settings.brand_color_accent|default:'#dc3545' }};
+            font-weight: bold;
+        }
+
+        /* --- Payments table --- */
+        .payments-section {
+            margin-bottom: 10px;
+        }
+
+        .payments-title {
+            font-size: 9px;
+            font-weight: bold;
+            color: {{ app_settings.brand_color_primary|default:'#2c5aa0' }};
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            margin-bottom: 4px;
+            padding-bottom: 2px;
+            border-bottom: 1px solid {{ app_settings.brand_color_primary|default:'#2c5aa0' }};
+        }
+
+        .payments-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .payments-table thead th {
+            background-color: #e9ecef;
+            color: #495057;
+            padding: 3px 6px;
+            font-size: 8px;
+            text-transform: uppercase;
+            border: none;
+        }
+
+        .payments-table tbody td {
+            padding: 3px 6px;
+            border-bottom: 1px solid #e9ecef;
+            font-size: 9px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 1px 4px;
+            border-radius: 2px;
+            font-size: 8px;
+            font-weight: bold;
+        }
+
+        .badge-cash { background-color: #d4edda; color: #155724; }
+        .badge-wave { background-color: #d1ecf1; color: #0c5460; }
+        .badge-mobile { background-color: #fff3cd; color: #856404; }
+        .badge-card { background-color: #cce5ff; color: #004085; }
+        .badge-bank { background-color: #e2e3e5; color: #383d41; }
+        .badge-credit { background-color: #f8d7da; color: #721c24; }
+        .badge-other { background-color: #e2e3e5; color: #383d41; }
+
+        /* --- Signature block --- */
+        .signature-block {
+            margin-top: 15px;
+            padding-top: 8px;
+            border-top: 1px dashed #ccc;
+        }
+
+        .signature-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .signature-table td {
+            border: none;
+            padding: 3px 8px;
+            vertical-align: bottom;
+        }
+
+        .signatory-info {
+            font-size: 8px;
+            color: #555;
+            text-align: right;
+        }
+
+        .signatory-name {
+            font-weight: bold;
+            font-size: 9px;
+            color: #333;
+        }
+
+        .signatory-mention {
+            font-size: 7px;
+            color: #999;
+            font-style: italic;
+        }
+
+        /* --- Footer --- */
+        .footer {
+            margin-top: 15px;
+            padding-top: 5px;
+            border-top: 1px solid #dee2e6;
+            text-align: center;
+            font-size: 8px;
+            color: #999;
+        }
+
+        .thank-you {
+            text-align: center;
+            font-size: 10px;
+            color: #555;
+            margin-top: 10px;
+            padding: 5px;
+            background-color: #f8f9fa;
+        }
+
+        /* --- Status badge --- */
+        .status-paid {
+            display: inline-block;
+            background-color: {{ app_settings.brand_color_secondary|default:'#198754' }};
+            color: white;
+            padding: 1px 6px;
+            border-radius: 2px;
+            font-size: 8px;
+            font-weight: bold;
+        }
+
+        .status-unpaid {
+            display: inline-block;
+            background-color: {{ app_settings.brand_color_accent|default:'#dc3545' }};
+            color: white;
+            padding: 1px 6px;
+            border-radius: 2px;
+            font-size: 8px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ===== HEADER ===== -->
+    <table class="header-table">
+        <tr>
+            <td style="width: 65%;">
+                <div class="company-name">{{ app_settings.company_name|default:'Mon Entreprise' }}</div>
+                <div class="company-info">{{ app_settings.company_tagline }}</div>
+            </td>
+            <td style="width: 35%; text-align: right;">
+                {% if app_settings and app_settings.company_logo %}
+                    <img src="{{ app_settings.company_logo.path }}" width="80" height="45" />
+                {% endif %}
+            </td>
+        </tr>
+    </table>
+
+    <!-- ===== INVOICE TITLE ===== -->
+    <div class="invoice-title-bar">
+        <h1>FACTURE</h1>
+    </div>
+
+    <!-- ===== ORDER + CLIENT INFO ===== -->
+    <table class="info-table">
+        <tr>
+            <td style="padding-right: 5px;">
+                <div class="info-block">
+                    <div class="info-block-title">Commande</div>
+                    <div><strong>N&deg;:</strong> {{ order.title }}</div>
+                    <div><strong>Date:</strong> {{ order.date|date:"d/m/Y" }}</div>
+                    <div>
+                        <strong>Statut:</strong>
+                        {% if order.is_paid %}
+                            <span class="status-paid">PAYEE</span>
+                        {% else %}
+                            <span class="status-unpaid">IMPAYEE</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </td>
+            <td style="padding-left: 5px;">
+                <div class="info-block">
+                    <div class="info-block-title">Client</div>
+                    {% if client %}
+                        <div><strong>Nom:</strong> {{ client.name }}</div>
+                        <div><strong>Tel:</strong> {{ client.phone|default:"-" }}</div>
+                    {% else %}
+                        <div>Client non specifie</div>
+                    {% endif %}
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    <!-- ===== PRODUCTS ===== -->
+    <table class="products-table">
+        <thead>
+            <tr>
+                <th class="text-left" style="width: 45%;">Produit</th>
+                <th class="text-center" style="width: 10%;">Qte</th>
+                <th class="text-right" style="width: 20%;">Prix Unit.</th>
+                <th class="text-right" style="width: 25%;">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for it in items %}
+            <tr>
+                <td>{{ it.product.title }}</td>
+                <td class="text-center">{{ it.qty }}</td>
+                <td class="text-right">{{ it.final_price|money_plain }} {{ currency }}</td>
+                <td class="text-right">{{ it.total_price|money_plain }} {{ currency }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="4" class="text-center">Aucun produit</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- ===== TOTALS ===== -->
+    <table class="totals-wrapper">
+        <tr>
+            <td style="width: 60%;">&nbsp;</td>
+            <td style="width: 40%;">
+                <table class="totals-table">
+                    {% if order.discount %}
+                    <tr>
+                        <td class="text-right">Remise:</td>
+                        <td class="text-right">-{{ order.discount|money_plain }} {{ currency }}</td>
+                    </tr>
+                    {% endif %}
+                    <tr class="total-row">
+                        <td class="text-right">TOTAL:</td>
+                        <td class="text-right">{{ order.final_value|money_plain }} {{ currency }}</td>
+                    </tr>
+                    <tr class="paid-row">
+                        <td class="text-right">Paye:</td>
+                        <td class="text-right">{{ order.amount_paid|money_plain }} {{ currency }}</td>
+                    </tr>
+                    {% if not order.is_paid %}
+                    <tr class="remaining-row">
+                        <td class="text-right">Reste:</td>
+                        <td class="text-right">{{ order.remaining_amount|money_plain }} {{ currency }}</td>
+                    </tr>
+                    {% endif %}
+                </table>
+            </td>
+        </tr>
+    </table>
+
+    <!-- ===== PAYMENTS DETAIL ===== -->
+    {% if payments %}
+    <div class="payments-section">
+        <div class="payments-title">Detail des paiements ({{ payments|length }})</div>
+        <table class="payments-table">
+            <thead>
+                <tr>
+                    <th class="text-left" style="width: 8%;">#</th>
+                    <th class="text-left" style="width: 22%;">Date</th>
+                    <th class="text-left" style="width: 25%;">Moyen</th>
+                    <th class="text-right" style="width: 25%;">Montant</th>
+                    <th class="text-left" style="width: 20%;">Note</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for payment in payments %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ payment.date|date:"d/m/Y" }}</td>
+                    <td>
+                        <span class="badge badge-{{ payment.method }}">
+                            {{ payment.get_method_display }}
+                        </span>
+                    </td>
+                    <td class="text-right">{{ payment.amount|money_plain }} {{ currency }}</td>
+                    <td>{{ payment.note|default:"-" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    <!-- ===== SIGNATURE ===== -->
+    {% if app_settings.signature_image or app_settings.stamp_image %}
+    <div class="signature-block">
+        <table class="signature-table">
+            <tr>
+                <td style="width: 50%; text-align: left;">
+                    {% if app_settings.stamp_image %}
+                        <img src="{{ app_settings.stamp_image.path }}" width="55" height="55" />
+                    {% endif %}
+                </td>
+                <td style="width: 50%; text-align: right;">
+                    {% if app_settings.signature_image %}
+                        <img src="{{ app_settings.signature_image.path }}" width="90" height="40" />
+                    {% endif %}
+                    <div class="signatory-info">
+                        {% if app_settings.signatory_name %}
+                            <div class="signatory-name">{{ app_settings.signatory_name }}</div>
+                        {% endif %}
+                        <div>Facture validee le {% now "d/m/Y" %}</div>
+                        <div class="signatory-mention">Signature electronique</div>
+                    </div>
+                </td>
+            </tr>
+        </table>
+    </div>
+    {% endif %}
+
+    <!-- ===== THANK YOU ===== -->
+    <div class="thank-you">
+        Merci pour votre achat !
+    </div>
+
+    <!-- ===== FOOTER ===== -->
+    <div class="footer">
+        {{ app_settings.company_name|default:'Mon Entreprise' }}
+        {% if app_settings.company_tagline %} &mdash; {{ app_settings.company_tagline }}{% endif %}
+        &mdash; Facture generee le {% now "d/m/Y H:i" %}
+    </div>
+
+</body>
+</html>

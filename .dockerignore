@@ -1,0 +1,27 @@
+# Seul blog_pos/ (sans données ni anciens fichiers desktop) entre dans l'image.
+.git
+.github
+**/__pycache__
+**/*.pyc
+dama_env
+cloud_server
+desktop_app
+build
+dist
+scripts
+*.spec
+build_standalone.py
+*.md
+docker-compose.yml
+
+blog_pos/.env
+blog_pos/db.sqlite3*
+blog_pos/secret_key.txt
+blog_pos/media
+blog_pos/logs
+blog_pos/staticfiles
+blog_pos/Welto.py
+blog_pos/sync
+blog_pos/licensing
+blog_pos/order/static
+blog_pos/order/templates/source

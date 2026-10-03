@@ -1,0 +1,25 @@
+{% load static %}<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0f1b2d">
+  <title>{% block title %}{% endblock %} · {{ company_name|default:"WELTO" }}</title>
+  <link rel="icon" href="{% static 'img/favicon.svg' %}" type="image/svg+xml">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <script src="{% static 'js/app.js' %}" defer></script>
+</head>
+<body class="bg-navy-950">
+  <main class="mx-auto flex min-h-dvh w-full {% block width %}max-w-sm{% endblock %} flex-col justify-center px-4 py-10">
+    <div class="mb-6 text-center">
+      <span class="inline-grid h-12 w-12 place-items-center rounded-xl bg-amber-500 text-2xl font-black text-navy-950">W</span>
+      <p class="mt-3 text-lg font-semibold text-white">{{ company_name|default:"WELTO" }}</p>
+    </div>
+    <div class="rounded-2xl bg-white p-6 shadow-xl">
+      {% include 'partials/messages.html' %}
+      {% block content %}{% endblock %}
+    </div>
+    {% block below %}{% endblock %}
+  </main>
+</body>
+</html>

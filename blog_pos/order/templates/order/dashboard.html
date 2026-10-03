@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+{% load welto %}
+{% block title %}Tableau de bord{% endblock %}
+{% block content %}
+<div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+  <h1 class="text-xl font-bold">Tableau de bord</h1>
+  <span class="text-sm text-slate-500">{{ today|date:"l j F Y" }}</span>
+</div>
+
+<div class="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+  <div class="kpi">
+    <p class="kpi-label">Ventes du jour</p>
+    <p class="kpi-value">{{ today_stats.total|money }}</p>
+    <p class="mt-1 text-xs text-slate-500">{{ today_stats.count }} vente{{ today_stats.count|pluralize }} · hier {{ yesterday_stats.total|money }}</p>
+  </div>
+  <div class="kpi">
+    <p class="kpi-label">Encaissé aujourd'hui</p>
+    <p class="kpi-value text-emerald-700">{{ today_stats.paid|money }}</p>
+    <p class="mt-1 text-xs text-slate-500">sur les ventes du jour</p>
+  </div>
+  <div class="kpi">
+    <p class="kpi-label">Ventes du mois</p>
+    <p class="kpi-value">{{ month_stats.total|money }}</p>
+    <p class="mt-1 text-xs text-slate-500">Marge {{ month_margin|money }} · net {{ month_net|money }}</p>
+  </div>
+  <a href="{% url 'order_list' %}?status=unpaid" class="kpi block hover:ring-2 hover:ring-rose-200">
+    <p class="kpi-label">Crédits clients</p>
+    <p class="kpi-value {% if unpaid_total %}text-rose-700{% endif %}">{{ unpaid_total|money }}</p>
+    <p class="mt-1 text-xs text-slate-500">{{ unpaid_count }} vente{{ unpaid_count|pluralize }} non soldée{{ unpaid_count|pluralize }}</p>
+  </a>
+</div>
+
+<div class="grid gap-4 lg:grid-cols-3">
+  <div class="card p-4 lg:col-span-2">
+    <h2 class="mb-4 font-semibold">7 derniers jours <span class="text-sm font-normal text-slate-500">({{ currency }})</span></h2>
+    <div class="flex h-48 items-end gap-2">
+      {% for d in week %}
+      <div class="flex h-full flex-1 flex-col items-center justify-end gap-1" title="{{ d.date|date:'d/m' }} : {{ d.total|money }}">
+        <span class="text-[10px] font-semibold tabular-nums text-slate-600">{% if d.total %}{{ d.total|money }}{% endif %}</span>
+        <div class="w-full rounded-t-md {% if forloop.last %}bg-amber-500{% else %}bg-navy-700{% endif %}" style="height: {{ d.pct }}%; min-height: 2px"></div>
+        <span class="text-xs text-slate-500">{{ d.date|date:"D" }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card p-4">
+    <h2 class="mb-3 font-semibold">Top produits du mois</h2>
+    <ol class="space-y-2 text-sm">
+      {% for p in top_products %}
+      <li class="flex items-center gap-2"><span class="truncate">{{ p.product__title }}</span><span class="ml-auto text-slate-500">×{{ p.qty }}</span><span class="num w-24 text-right font-semibold">{{ p.total|money }}</span></li>
+      {% empty %}<li class="text-slate-500">Aucune vente ce mois-ci.</li>{% endfor %}
+    </ol>
+  </div>
+
+  <div class="card p-4">
+    <div class="mb-3 flex items-center justify-between">
+      <h2 class="font-semibold">Stock bas <span class="text-sm font-normal text-slate-500">(&lt; {{ threshold }})</span></h2>
+      <a href="{% url 'product:product_list' %}?status=low" class="text-sm text-navy-700 hover:underline">Voir tout</a>
+    </div>
+    <ul class="space-y-2 text-sm">
+      {% for p in low_stock %}
+      <li class="flex items-center gap-2"><a href="{% url 'product:quick_stock' p.pk %}" class="truncate hover:underline">{{ p.title }}</a>
+        <span class="badge ml-auto {% if p.qty == 0 %}badge-red{% else %}badge-amber{% endif %}">{{ p.qty }}</span></li>
+      {% empty %}<li class="text-slate-500">Aucune alerte.</li>{% endfor %}
+    </ul>
+  </div>
+
+  <div class="card p-4 lg:col-span-2">
+    <div class="mb-3 flex items-center justify-between">
+      <h2 class="font-semibold">Dernières ventes</h2>
+      <a href="{% url 'order_list' %}" class="text-sm text-navy-700 hover:underline">Voir tout</a>
+    </div>
+    <ul class="divide-y divide-slate-100 text-sm">
+      {% for o in recent_orders %}
+      <li><a href="{{ o.get_absolute_url }}" class="flex items-center gap-3 py-2 hover:bg-slate-50">
+        <span class="font-semibold">{{ o.title }}</span><span class="text-slate-500">{{ o.timestamp|date:"H:i" }}</span>
+        <span class="truncate text-slate-500">{{ o.client.name|default:"" }}</span>
+        <span class="num ml-auto font-semibold">{{ o.final_value|money }}</span>
+        {% if not o.is_paid %}<span class="badge badge-red">dû</span>{% endif %}</a></li>
+      {% empty %}<li class="py-2 text-slate-500">Aucune vente.</li>{% endfor %}
+    </ul>
+  </div>
+</div>
+{% endblock %}
