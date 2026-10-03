@@ -151,6 +151,15 @@ class CheckoutTests(SaleTestCase):
         self.assertFalse(Order.objects.exists())
         self.assertEqual(self.qty(self.riz), 10)
 
+    def test_fully_paid_sale_can_have_a_client(self):
+        for method in ('cash', 'mobile', 'card'):
+            with self.subTest(method=method):
+                order = self.sell([(self.savon, 1)], method=method, client_id=self.client_.pk).order
+                self.assertTrue(order.is_paid)
+                self.assertEqual(order.client, self.client_)
+        self.assertEqual(self.client_.total_orders(), 3)
+        self.assertEqual(self.client_.total_unpaid_amount(), D('0'))
+
     def test_partial_payment_with_client(self):
         order = self.sell([(self.riz, 1)], amount='10000', client_id=self.client_.pk).order
         self.assertFalse(order.is_paid)

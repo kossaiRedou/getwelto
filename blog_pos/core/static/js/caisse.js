@@ -281,7 +281,7 @@
     el.discountBtn.classList.toggle('text-amber-300', !!t.discount);
 
     var c = state.client;
-    el.clientLabel.textContent = c ? c.name + (c.debt ? ' · doit ' + fmt(c.debt) : '') : 'Client comptoir';
+    el.clientLabel.textContent = c ? c.name + (c.debt ? ' · doit ' + fmt(c.debt) : '') : 'Ajouter un client (facultatif)';
     el.clientBtn.classList.toggle('border-amber-500', !!c);
 
     Array.prototype.forEach.call(el.methods.querySelectorAll('[data-method]'), function (b) {
