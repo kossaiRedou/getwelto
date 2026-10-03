@@ -2,8 +2,8 @@ from decimal import Decimal
 
 from django import forms
 
-from core.forms import StyledFormMixin
-from .models import Category, Product
+from core.forms import ColorSwatches, StyledFormMixin
+from .models import COLOR_CHOICES, Category, Product
 
 MONEY_ATTRS = {'inputmode': 'decimal', 'step': '0.01', 'min': '0'}
 
@@ -17,7 +17,7 @@ class ProductForm(StyledFormMixin, forms.ModelForm):
 
     class Meta:
         model = Product
-        fields = ['title', 'barcode', 'category', 'value', 'discount_value', 'prix_achat', 'active']
+        fields = ['title', 'barcode', 'category', 'color', 'value', 'discount_value', 'prix_achat', 'active']
         labels = {
             'title': 'Nom du produit',
             'barcode': 'Code-barres',
@@ -26,8 +26,10 @@ class ProductForm(StyledFormMixin, forms.ModelForm):
             'discount_value': 'Prix promo',
             'prix_achat': "Prix d'achat",
             'active': 'Produit en vente',
+            'color': 'Couleur à la caisse',
         }
         help_texts = {
+            'color': 'Par défaut, le produit prend la couleur de sa catégorie.',
             'barcode': 'Facultatif : scannez le code avec la douchette.',
             'discount_value': 'Facultatif : laissez vide s’il n’y a pas de promotion.',
             'prix_achat': 'Facultatif, mais nécessaire pour connaître votre marge.',
@@ -46,8 +48,11 @@ class ProductForm(StyledFormMixin, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['category'].empty_label = '— Aucune —'
+        self.fields['category'].empty_label = None
         self.fields['category'].required = False
+        if not self.instance.pk and not self.initial.get('category'):
+            self.initial['category'] = Category.get_default().pk
+        self.fields['color'].widget = ColorSwatches(choices=[('', 'Comme la catégorie')] + COLOR_CHOICES)
         self.fields['barcode'].required = False
         for name in ('discount_value', 'prix_achat'):
             self.fields[name].required = False
@@ -61,6 +66,12 @@ class ProductForm(StyledFormMixin, forms.ModelForm):
 
     def clean_prix_achat(self):
         return self.cleaned_data.get('prix_achat') or Decimal('0')
+
+    def clean_color(self):
+        color = self.cleaned_data.get('color') or ''
+        if color and color not in dict(COLOR_CHOICES):
+            raise forms.ValidationError('Couleur invalide.')
+        return color
 
     def clean_barcode(self):
         return (self.cleaned_data.get('barcode') or '').strip() or None
@@ -81,9 +92,17 @@ class ProductForm(StyledFormMixin, forms.ModelForm):
 class CategoryForm(StyledFormMixin, forms.ModelForm):
     class Meta:
         model = Category
-        fields = ['title']
-        labels = {'title': 'Nouvelle catégorie'}
-        widgets = {'title': forms.TextInput(attrs={'placeholder': 'Ex : Boissons'})}
+        fields = ['title', 'color']
+        labels = {'title': 'Nom', 'color': 'Couleur'}
+        error_messages = {'title': {'unique': 'Cette catégorie existe déjà.'}}
+        widgets = {'title': forms.TextInput(attrs={'placeholder': 'Ex : Boissons'}),
+                   'color': ColorSwatches(choices=COLOR_CHOICES)}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['color'].required = True
+        if not self.instance.pk and not self.is_bound:
+            self.initial['color'] = Category.next_color()
 
 
 class StockForm(StyledFormMixin, forms.Form):

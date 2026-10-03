@@ -49,6 +49,18 @@
   function toInput(cents) {
     return toDecimal(cents).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
   }
+  // « Coca-Cola 1L » → « CC » (même règle que product.models.initials)
+  function initials(title) {
+    var words = String(title || '').split(/[\s\-_\/.,]+/).filter(Boolean);
+    return (words.slice(0, 2).map(function (w) { return w.charAt(0); }).join('') || '?').toUpperCase();
+  }
+  // N'accepte qu'une couleur « #rrggbb » (protège l'attribut style).
+  function safeColor(c) { return /^#[0-9a-fA-F]{6}$/.test(c || '') ? c : '#64748b'; }
+  function badge(title, color, cls) {
+    return '<span class="grid shrink-0 place-items-center rounded-lg font-black text-white ' + (cls || 'h-10 w-10 text-sm') +
+      '" style="background:' + safeColor(color) + '" aria-hidden="true">' + esc(initials(title)) + '</span>';
+  }
+
   function uuid() {
     if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
     var b = new Uint8Array(16);
@@ -119,7 +131,7 @@
 
   window.WeltoKit = {
     loadJSON: loadJSON, saveJSON: saveJSON, esc: esc, norm: norm, fmt: fmt, parseMoney: parseMoney,
-    toDecimal: toDecimal, toInput: toInput, uuid: uuid, beep: beep, toaster: toaster, requester: requester,
+    toDecimal: toDecimal, toInput: toInput, uuid: uuid, initials: initials, safeColor: safeColor, badge: badge, beep: beep, toaster: toaster, requester: requester,
     finePointer: !!(window.matchMedia && window.matchMedia('(pointer: fine)').matches)
   };
 })();

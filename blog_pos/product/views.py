@@ -5,9 +5,10 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import ProtectedError, Q
+from django.db.models import Count, ProtectedError, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
 from aprovision.models import MouvementStock
@@ -16,7 +17,7 @@ from core.decorators import api_manager_required, manager_required
 from core.utils import json_etag_response, to_cents
 from users.models import AppSetting
 from .forms import CategoryForm, ProductForm, StockForm
-from .models import Category, Product, get_low_stock_threshold
+from .models import DEFAULT_CATEGORY_COLOR, Category, Product, get_low_stock_threshold
 
 
 @login_required
@@ -131,22 +132,42 @@ def product_delete(request, pk):
 
 @manager_required
 def category_management(request):
+    Category.get_default()
     form = CategoryForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
         category = form.save()
         messages.success(request, f'Catégorie « {category.title} » créée.')
         return redirect('product:category_management')
-    from django.db.models import Count
-    categories = Category.objects.annotate(n=Count('product'))
+    categories = Category.objects.annotate(n=Count('product')).order_by('-is_default', 'title')
     return render(request, 'product/categories.html', {'form': form, 'categories': categories})
+
+
+@manager_required
+def category_edit(request, pk):
+    category = get_object_or_404(Category, pk=pk)
+    form = CategoryForm(request.POST or None, instance=category)
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        messages.success(request, f'Catégorie « {category.title} » modifiée.')
+        return redirect('product:category_management')
+    return render(request, 'product/category_form.html', {'form': form, 'category': category})
 
 
 @require_POST
 @manager_required
 def category_delete(request, pk):
     category = get_object_or_404(Category, pk=pk)
-    category.delete()
-    messages.success(request, f'Catégorie « {category.title} » supprimée (ses produits restent, sans catégorie).')
+    if category.is_default:
+        messages.error(request, f'La catégorie « {category.title} » ne peut pas être supprimée : '
+                                'elle accueille les produits sans catégorie.')
+        return redirect('product:category_management')
+    default = Category.get_default()
+    with transaction.atomic():
+        moved = Product.objects.filter(category=category).update(category=default, updated_at=timezone.now())
+        category.delete()
+    messages.success(request, f'Catégorie « {category.title} » supprimée'
+                              + (f' : {moved} produit{"s" if moved > 1 else ""} déplacé{"s" if moved > 1 else ""} '
+                                 f'dans « {default.title} ».' if moved else '.'))
     return redirect('product:category_management')
 
 
@@ -154,6 +175,7 @@ def category_delete(request, pk):
 
 @manager_required
 def restock_page(request):
+    Category.get_default()
     return render(request, 'product/restock.html', {'categories': Category.objects.all()})
 
 
@@ -162,13 +184,14 @@ def restock_page(request):
 def api_stock_catalog(request):
     """Catalogue de la réception : tous les produits (même retirés de la vente), avec prix d'achat."""
     rows = Product.objects.order_by('title').values_list(
-        'id', 'title', 'barcode', 'value', 'qty', 'category_id', 'prix_achat', 'active', 'discount_value')
+        'id', 'title', 'barcode', 'value', 'qty', 'category_id', 'prix_achat', 'active', 'discount_value',
+        'color', 'category__color')
     return json_etag_response(request, {
         'currency': AppSetting.get_currency_label(),
         'products': [[pid, title, barcode or '', to_cents(value), qty, cat or 0, to_cents(cost),
-                      1 if active else 0, to_cents(promo)]
-                     for pid, title, barcode, value, qty, cat, cost, active, promo in rows],
-        'categories': list(Category.objects.order_by('title').values_list('id', 'title')),
+                      1 if active else 0, to_cents(promo), color or cat_color or DEFAULT_CATEGORY_COLOR]
+                     for pid, title, barcode, value, qty, cat, cost, active, promo, color, cat_color in rows],
+        'categories': list(Category.objects.values_list('id', 'title', 'color')),
     })
 
 

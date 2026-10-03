@@ -37,3 +37,8 @@ class StyledFormMixin:
                 if isinstance(field, forms.DecimalField) and isinstance(value, Decimal) \
                         and value == value.to_integral_value():
                     self.initial[name] = int(value)
+
+
+class ColorSwatches(forms.RadioSelect):
+    """Choix de couleur par pastilles (palette fixe, adapté au tactile, sans JavaScript)."""
+    template_name = 'core/widgets/color_swatches.html'

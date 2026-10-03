@@ -2,25 +2,42 @@
 {% load welto %}
 {% block title %}Catégories{% endblock %}
 {% block content %}
-<div class="mx-auto max-w-2xl">
-  <div class="page-header justify-start">
-    <a href="{% url 'product:product_list' %}" class="back-link" aria-label="Retour">{% icon 'back' 'h-5 w-5' %}</a>
-    <h1 class="page-title">Catégories</h1>
+<div class="mx-auto max-w-3xl">
+  <div class="page-header">
+    <div class="flex items-center gap-3">
+      <a href="{% url 'product:product_list' %}" class="back-link" aria-label="Retour">{% icon 'back' 'h-5 w-5' %}</a>
+      <div>
+        <h1 class="page-title">Catégories</h1>
+        <p class="page-subtitle">La couleur d'une catégorie repère ses produits à la caisse.</p>
+      </div>
+    </div>
   </div>
-  <form method="post" class="card mb-4 flex items-end gap-2 p-4">{% csrf_token %}
-    {% include 'partials/field.html' with field=form.title class='flex-1' %}
-    <button class="btn btn-primary">{% icon 'plus' 'h-4 w-4' %} Créer</button>
+
+  <form method="post" class="card mb-6 space-y-4 p-5 sm:p-6">{% csrf_token %}
+    <h2 class="font-semibold">Nouvelle catégorie</h2>
+    {% include 'partials/form_errors.html' %}
+    {% include 'partials/field.html' with field=form.title %}
+    {% include 'partials/field.html' with field=form.color %}
+    <div class="flex justify-end"><button class="btn btn-primary">{% icon 'plus' 'h-4 w-4' %} Créer</button></div>
   </form>
+
   <div class="card divide-y divide-slate-100">
     {% for c in categories %}
     <div class="flex items-center gap-3 px-4 py-3">
-      <span class="font-medium">{{ c.title }}</span>
-      <a href="{% url 'product:product_list' %}?category={{ c.pk }}" class="text-sm text-slate-500 hover:underline">{{ c.n }} produit{{ c.n|pluralize }}</a>
-      <form method="post" action="{% url 'product:delete_category' c.pk %}" class="ml-auto" data-confirm="Supprimer la catégorie « {{ c.title }} » ? Ses produits sont conservés.">{% csrf_token %}
-        <button class="rounded p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600" aria-label="Supprimer">{% icon 'trash' 'h-4 w-4' %}</button>
+      {% color_dot c.color 'h-8 w-8' %}
+      <div class="min-w-0 flex-1">
+        <p class="truncate font-semibold">{{ c.title }}{% if c.is_default %} <span class="badge badge-gray">par défaut</span>{% endif %}</p>
+        <a href="{% url 'product:product_list' %}?category={{ c.pk }}&status=all" class="text-sm text-slate-500 hover:underline">{{ c.n }} produit{{ c.n|pluralize }}</a>
+      </div>
+      <a href="{% url 'product:edit_category' c.pk %}" class="btn btn-light btn-sm">{% icon 'edit' 'h-4 w-4' %} Modifier</a>
+      {% if not c.is_default %}
+      <form method="post" action="{% url 'product:delete_category' c.pk %}" data-confirm="Supprimer la catégorie « {{ c.title }} » ? Ses produits passeront dans « Autres ».">{% csrf_token %}
+        <button class="grid h-8 w-8 place-items-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600" aria-label="Supprimer">{% icon 'trash' 'h-4 w-4' %}</button>
       </form>
+      {% else %}<span class="h-8 w-8"></span>{% endif %}
     </div>
-    {% empty %}<p class="px-4 py-6 text-center text-slate-500">Aucune catégorie.</p>{% endfor %}
+    {% endfor %}
   </div>
+  <p class="mt-3 text-sm text-slate-500">« Autres » accueille les produits sans catégorie et ceux d'une catégorie supprimée : elle ne peut pas être supprimée, mais vous pouvez la renommer.</p>
 </div>
 {% endblock %}

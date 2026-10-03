@@ -77,3 +77,17 @@ def query_transform(context, **kwargs):
 def money_plain(value):
     """Variante pour le PDF : espace normal (les polices PDF n'ont pas l'espace fine)."""
     return format_money(value).replace(' ', ' ')
+
+
+@register.simple_tag
+def product_badge(product, cls='h-9 w-9 text-xs'):
+    """Pastille colorée avec les initiales du produit (couleur du produit ou de sa catégorie)."""
+    return format_html('<span class="grid shrink-0 place-items-center rounded-lg font-black text-white {}" '
+                       'style="background:{}" aria-hidden="true">{}</span>',
+                       cls, product.display_color, product.initials)
+
+
+@register.simple_tag
+def color_dot(color, cls='h-3 w-3'):
+    return format_html('<span class="inline-block shrink-0 rounded-full {}" style="background:{}" aria-hidden="true"></span>',
+                       cls, color or '#64748b')

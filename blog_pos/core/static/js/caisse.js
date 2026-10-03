@@ -65,7 +65,7 @@
   function applyCatalog(data) {
     var byId = {}, byBarcode = {};
     var products = data.products.map(function (row) {
-      var p = { id: row[0], title: row[1], barcode: row[2], price: row[3], stock: row[4], cat: row[5] };
+      var p = { id: row[0], title: row[1], barcode: row[2], price: row[3], stock: row[4], cat: row[5], color: K.safeColor(row[6]) };
       p.key = norm(p.title + ' ' + p.barcode);
       byId[p.id] = p;
       if (p.barcode) byBarcode[p.barcode] = p;
@@ -126,12 +126,17 @@
 
   function renderCats() {
     if (!catalog.categories.length) { el.cats.innerHTML = ''; return; }
-    var chip = function (id, label) {
+    var chip = function (id, label, color) {
       var on = category === id;
-      return '<button type="button" data-cat="' + id + '" class="shrink-0 rounded-full px-3 py-1.5 text-sm font-medium ' +
-        (on ? 'bg-brand-600 text-white' : 'bg-navy-800 text-slate-300 hover:bg-navy-700') + '">' + esc(label) + '</button>';
+      return '<button type="button" data-cat="' + id + '" class="inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium ' +
+        (on ? 'bg-brand-600 text-white' : 'bg-navy-800 text-slate-300 hover:bg-navy-700') + '">' +
+        (color ? '<span class="h-2.5 w-2.5 rounded-full" style="background:' + K.safeColor(color) + '"></span>' : '') +
+        esc(label) + '</button>';
     };
-    el.cats.innerHTML = chip(0, 'Tout') + catalog.categories.map(function (c) { return chip(c[0], c[1]); }).join('');
+    var used = {};
+    catalog.products.forEach(function (p) { used[p.cat] = true; });
+    el.cats.innerHTML = chip(0, 'Tout') + catalog.categories.filter(function (c) { return used[c[0]]; })
+      .map(function (c) { return chip(c[0], c[1], c[2]); }).join('');
   }
 
   var resultsList = [];
@@ -148,8 +153,8 @@
     }
     el.results.innerHTML = '<div class="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">' + resultsList.map(function (p) {
       var out = p.stock <= 0;
-      return '<button type="button" data-add="' + p.id + '" class="flex w-full items-center gap-3 rounded-xl bg-navy-900 px-3 py-3 text-left ring-1 ring-navy-800 hover:bg-navy-800 active:bg-navy-700' + (out ? ' opacity-50' : '') + '">' +
-        '<span class="min-w-0 flex-1"><span class="block truncate font-semibold text-white">' + esc(p.title) + '</span>' +
+      return '<button type="button" data-add="' + p.id + '" class="flex w-full items-center gap-3 rounded-xl border-l-4 bg-navy-900 py-2.5 pl-2.5 pr-3 text-left ring-1 ring-navy-800 hover:bg-navy-800 active:bg-navy-700' + (out ? ' opacity-50' : '') + '" style="border-left-color:' + p.color + '">' +
+        K.badge(p.title, p.color) + '<span class="min-w-0 flex-1"><span class="block truncate font-semibold text-white">' + esc(p.title) + '</span>' +
         '<span class="block text-xs ' + (out ? 'text-rose-400' : 'text-slate-400') + '">' + (out ? 'Rupture de stock' : 'Stock : ' + p.stock) + '</span></span>' +
         '<span class="shrink-0 font-bold tabular-nums text-brand-300">' + fmt(p.price) + '</span></button>';
     }).join('') + '</div>';
@@ -263,8 +268,8 @@
           (l.price != null ? '<button type="button" data-reset-price="' + p.id + '" class="rounded-md px-1.5 py-0.5 text-slate-400 hover:bg-navy-700 hover:text-white">↺ prix normal</button>' : '') +
           '</span>';
       }
-      return '<li data-line="' + p.id + '" class="rounded-xl bg-navy-800 p-3 transition' + (l.price != null ? ' ring-1 ring-brand-400/50' : '') + '">' +
-        '<div class="flex items-start gap-3"><div class="min-w-0 flex-1">' +
+      return '<li data-line="' + p.id + '" class="rounded-xl border-l-4 bg-navy-800 p-3 transition' + (l.price != null ? ' ring-1 ring-brand-400/50' : '') + '" style="border-left-color:' + p.color + '">' +
+        '<div class="flex items-start gap-3">' + K.badge(p.title, p.color, 'h-9 w-9 text-xs') + '<div class="min-w-0 flex-1">' +
         '<p class="truncate font-semibold text-white">' + esc(p.title) + '</p>' + priceHtml + '</div>' +
         '<p class="shrink-0 text-lg font-bold tabular-nums text-white">' + fmt(unit * l.qty) + '</p></div>' +
         '<div class="mt-2 flex items-center gap-2">' +

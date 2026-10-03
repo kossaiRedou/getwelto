@@ -1,0 +1,14 @@
+<div class="flex flex-wrap gap-2" role="radiogroup">
+{% for group, options, index in widget.optgroups %}{% for option in options %}
+  <label class="cursor-pointer" title="{{ option.label }}">
+    <input type="radio" name="{{ option.name }}" value="{{ option.value }}" id="{{ option.attrs.id }}" class="peer sr-only"{% if option.selected %} checked{% endif %}>
+    {% if option.value %}
+    <span class="grid h-10 w-10 place-items-center rounded-full ring-2 ring-transparent ring-offset-2 transition peer-checked:ring-slate-900 peer-focus-visible:ring-brand-500" style="background:{{ option.value }}">
+      <svg class="h-5 w-5 text-white opacity-0 [.peer:checked+span_&]:opacity-100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+    </span>
+    {% else %}
+    <span class="flex h-10 items-center rounded-full border border-dashed border-slate-300 px-3 text-xs font-semibold text-slate-600 ring-2 ring-transparent ring-offset-2 transition peer-checked:border-slate-900 peer-checked:ring-slate-900">{{ option.label }}</span>
+    {% endif %}
+  </label>
+{% endfor %}{% endfor %}
+</div>

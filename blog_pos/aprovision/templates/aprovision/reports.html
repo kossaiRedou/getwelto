@@ -67,7 +67,7 @@
   <div class="card p-4">
     <h2 class="mb-3 font-semibold">Par catégorie</h2>
     <ul class="space-y-2 text-sm">
-      {% for c in by_category %}<li class="flex gap-2"><span class="truncate">{{ c.product__category__title|default:"Sans catégorie" }}</span><span class="ml-auto text-slate-500">×{{ c.qty }}</span><span class="num w-24 text-right font-semibold">{{ c.total|money }}</span></li>{% empty %}<li class="text-slate-500">—</li>{% endfor %}
+      {% for c in by_category %}<li class="flex items-center gap-2">{% color_dot c.product__category__color %}<span class="truncate">{{ c.product__category__title }}</span><span class="ml-auto text-slate-500">×{{ c.qty }}</span><span class="num w-24 text-right font-semibold">{{ c.total|money }}</span></li>{% empty %}<li class="text-slate-500">—</li>{% endfor %}
     </ul>
   </div>
 

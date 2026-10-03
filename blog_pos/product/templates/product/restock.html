@@ -72,7 +72,7 @@
       <div class="grid grid-cols-2 gap-3">
         <div><label class="label" for="new-barcode">Code-barres</label><input id="new-barcode" name="barcode" class="input" autocomplete="off"></div>
         <div><label class="label" for="new-category">Catégorie</label>
-          <select id="new-category" name="category" class="input"><option value="">— Aucune —</option>{% for c in categories %}<option value="{{ c.pk }}">{{ c.title }}</option>{% endfor %}</select></div>
+          <select id="new-category" name="category" class="input">{% for c in categories %}<option value="{{ c.pk }}"{% if c.is_default %} selected{% endif %}>{{ c.title }}</option>{% endfor %}</select></div>
         <div><label class="label" for="new-cost">Prix d'achat *</label><input id="new-cost" name="cost" class="input text-right" inputmode="decimal" autocomplete="off"></div>
         <div><label class="label" for="new-price">Prix de vente *</label><input id="new-price" name="price" class="input text-right" inputmode="decimal" autocomplete="off"></div>
         <div><label class="label" for="new-qty">Quantité reçue *</label><input id="new-qty" name="qty" class="input text-right" inputmode="numeric" value="1" autocomplete="off"></div>

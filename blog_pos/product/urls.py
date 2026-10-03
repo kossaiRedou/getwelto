@@ -12,6 +12,7 @@ urlpatterns = [
     path('<int:pk>/toggle/', views.product_toggle, name='toggle_product'),
     path('<int:pk>/delete/', views.product_delete, name='delete_product'),
     path('categories/', views.category_management, name='category_management'),
+    path('categories/<int:pk>/edit/', views.category_edit, name='edit_category'),
     path('categories/<int:pk>/delete/', views.category_delete, name='delete_category'),
     path('restock/', views.restock_page, name='restock'),
     path('api/stock-catalog/', views.api_stock_catalog, name='api_stock_catalog'),

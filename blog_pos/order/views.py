@@ -15,7 +15,7 @@ from django.views.decorators.http import require_GET, require_POST
 from aprovision.models import Depense
 from core.decorators import api_login_required, manager_required
 from core.utils import format_money, json_etag_response, parse_iso_date, to_cents
-from product.models import Category, Product, get_low_stock_threshold
+from product.models import DEFAULT_CATEGORY_COLOR, Category, Product, get_low_stock_threshold
 from users.models import AppSetting
 from . import services
 from .models import Order, OrderItem, PaymentMethod
@@ -37,12 +37,13 @@ def pos_view(request):
 def api_catalog(request):
     """Catalogue compact de la caisse, mis en cache par le navigateur (ETag → 304)."""
     rows = (Product.objects.filter(active=True).order_by('title')
-            .values_list('id', 'title', 'barcode', 'final_value', 'qty', 'category_id'))
+            .values_list('id', 'title', 'barcode', 'final_value', 'qty', 'category_id', 'color', 'category__color'))
     return json_etag_response(request, {
         'currency': AppSetting.get_currency_label(),
-        'products': [[pid, title, barcode or '', to_cents(price), qty, cat or 0]
-                     for pid, title, barcode, price, qty, cat in rows],
-        'categories': list(Category.objects.order_by('title').values_list('id', 'title')),
+        'products': [[pid, title, barcode or '', to_cents(price), qty, cat or 0,
+                      color or cat_color or DEFAULT_CATEGORY_COLOR]
+                     for pid, title, barcode, price, qty, cat, color, cat_color in rows],
+        'categories': list(Category.objects.values_list('id', 'title', 'color')),
     })
 
 

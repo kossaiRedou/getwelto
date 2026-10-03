@@ -70,7 +70,7 @@ def reports_view(request):
         'series': daily_series(orders, start, end) if days <= 62 else None,
         'top_products': items.values('product__title').annotate(qty=Sum('qty'), total=Sum('total_price'))
                              .order_by('-total')[:10],
-        'by_category': items.values('product__category__title').annotate(qty=Sum('qty'), total=Sum('total_price'))
+        'by_category': items.values('product__category__title', 'product__category__color').annotate(qty=Sum('qty'), total=Sum('total_price'))
                             .order_by('-total'),
         'presets': [
             ("Aujourd'hui", today, today),
