@@ -12,17 +12,22 @@
      data-catalog-url="{% url 'product:api_stock_catalog' %}"
      data-receive-url="{% url 'product:api_receive' %}"
      data-login-url="{% url 'users:login' %}"
+     data-zxing-url="{% static 'vendor/zxing-0.21.3.min.js' %}"
      data-currency="{{ currency }}">
 
   {# ------------------------------------------------ Recherche / produits #}
   <section class="flex min-h-0 flex-col lg:flex-1 [.searching_&]:flex-1">
     <div class="p-3 pb-2">
-      <label class="relative block">
+      <div class="flex gap-2">
+      <label class="relative block min-w-0 flex-1">
         <span class="pointer-events-none absolute inset-y-0 left-4 flex items-center text-slate-400">{% icon 'scan' 'h-6 w-6' %}</span>
         <input id="search" type="search" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="go"
                placeholder="Scanner ou rechercher un produit"
                class="w-full rounded-xl border-2 border-brand-500/70 bg-navy-900 py-3.5 pl-13 pr-4 text-lg text-white placeholder:text-slate-400 focus:border-brand-400 focus:outline-none">
       </label>
+      <button id="camera" type="button" hidden title="Scanner avec l'appareil photo" aria-label="Scanner avec l'appareil photo"
+              class="grid w-14 shrink-0 place-items-center rounded-xl border-2 border-brand-500/70 bg-navy-900 text-brand-200 hover:bg-navy-800 active:bg-brand-600 active:text-white">{% icon 'camera' 'h-6 w-6' %}</button>
+      </div>
       <p class="mt-1.5 px-1 text-xs text-slate-500">Produit inconnu ? Scannez-le ou tapez son nom : vous pourrez le créer ici.</p>
     </div>
     <div id="results" class="hidden min-h-0 flex-1 overflow-y-auto px-3 pb-3 lg:block [.searching_&]:block"></div>
@@ -106,4 +111,4 @@
 <div id="toast" hidden></div>
 {% endblock %}
 
-{% block scripts %}<script src="{% static 'js/kit.js' %}" defer></script><script src="{% static 'js/restock.js' %}" defer></script>{% endblock %}
+{% block scripts %}<script src="{% static 'js/kit.js' %}" defer></script><script src="{% static 'js/scanner.js' %}" defer></script><script src="{% static 'js/restock.js' %}" defer></script>{% endblock %}

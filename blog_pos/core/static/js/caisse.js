@@ -504,6 +504,24 @@
     }
   });
 
+  // Scan avec l'appareil photo (dépannage quand il n'y a pas de douchette).
+  var cameraBtn = $('camera');
+  if (cameraBtn && window.WeltoScanner && window.WeltoScanner.supported()) {
+    cameraBtn.hidden = false;
+    cameraBtn.addEventListener('click', function () {
+      window.WeltoScanner.open({
+        zxingUrl: root.dataset.zxingUrl,
+        title: 'Caisse : scanner les produits',
+        onCode: function (code) {
+          var p = catalog.byBarcode[code];
+          if (!p) { beep(false); return 'Code inconnu : ' + code; }
+          if (!addProduct(p, 1)) return '« ' + p.title + ' » : stock épuisé';
+          return 'Ajouté : ' + p.title + ' (×' + line(p.id).qty + ')';
+        }
+      });
+    });
+  }
+
   el.results.addEventListener('click', function (e) {
     var b = e.target.closest('[data-add]');
     if (!b) return;

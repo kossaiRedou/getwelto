@@ -418,6 +418,31 @@
     if (looksLikeBarcode(q.text) || !findProducts(q.text).length) { K.beep(false); openNew(q.text); }
   });
 
+  // Scan avec l'appareil photo : un code inconnu ouvre directement la création du produit.
+  var cameraBtn = $('camera');
+  if (cameraBtn && window.WeltoScanner && window.WeltoScanner.supported()) {
+    cameraBtn.hidden = false;
+    cameraBtn.addEventListener('click', function () {
+      window.WeltoScanner.open({
+        zxingUrl: root.dataset.zxingUrl,
+        title: 'Réception : scanner les produits reçus',
+        onCode: function (code) {
+          var p = catalog.byBarcode[code];
+          if (p) {
+            addExisting(p, 1);
+            return 'Ajouté : ' + p.title + ' (×' + findLine(p.id).qty + ')';
+          }
+          K.beep(false);
+          el.search.value = code;
+          setSearching();
+          renderResults();
+          openNew(code);
+          return false;
+        }
+      });
+    });
+  }
+
   el.results.addEventListener('click', function (e) {
     var add = e.target.closest('[data-add]');
     if (add) {
