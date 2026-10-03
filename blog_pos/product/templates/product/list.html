@@ -36,7 +36,7 @@
       <tbody>
       {% for p in page_obj %}
         <tr class="{% if not p.active %}opacity-60{% endif %}">
-          <td><div class="flex items-center gap-3">{% product_badge p %}<div class="min-w-0"><span class="font-semibold">{{ p.title }}</span>{% if not p.active %} <span class="badge badge-gray">retiré</span>{% endif %}{% if p.barcode %}<span class="block text-xs text-slate-400">{{ p.barcode }}</span>{% endif %}</div></div></td>
+          <td><div class="flex items-center gap-3">{% product_badge p %}<div class="min-w-0"><span class="font-semibold" style="color:{{ p.text_color }}">{{ p.title }}</span>{% if not p.active %} <span class="badge badge-gray">retiré</span>{% endif %}{% if p.barcode %}<span class="block text-xs text-slate-400">{{ p.barcode }}</span>{% endif %}</div></div></td>
           <td class="text-slate-600"><span class="inline-flex items-center gap-1.5">{% color_dot p.category.color %}{{ p.category.title }}</span></td>
           <td class="num text-right font-semibold">{{ p.final_value|money }}{% if p.discount_value %}<span class="block text-xs font-normal text-slate-400 line-through">{{ p.value|money }}</span>{% endif %}</td>
           {% if is_mgr %}<td class="num text-right text-slate-500">{{ p.prix_achat|money }}</td>{% endif %}

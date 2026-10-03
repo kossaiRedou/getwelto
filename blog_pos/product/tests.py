@@ -95,3 +95,14 @@ class ColorTests(TestCase):
         self.assertIn([cat.pk, 'Boissons', '#2563eb'], data['categories'])
         stock = self.client.get(reverse('product:api_stock_catalog')).json()
         self.assertEqual({row[1]: row[9] for row in stock['products']}, colors)
+
+
+class TextColorTests(TestCase):
+    def test_text_color_is_darker_shade_of_display_color(self):
+        from .models import text_on_light
+        cat = Category.objects.create(title='Boissons', color='#2563eb')
+        p = Product.objects.create(title='Coca', value=Decimal('2000'), category=cat)
+        self.assertEqual(p.text_color, text_on_light('#2563eb'))
+        self.assertEqual(text_on_light('#ffffff', 0.5), '#808080')
+        p.color = '#dc2626'
+        self.assertEqual(p.text_color, text_on_light('#dc2626'))

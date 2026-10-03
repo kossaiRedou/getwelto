@@ -154,7 +154,7 @@
     el.results.innerHTML = '<div class="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">' + resultsList.map(function (p) {
       var out = p.stock <= 0;
       return '<button type="button" data-add="' + p.id + '" class="flex w-full items-center gap-3 rounded-xl border-l-4 bg-navy-900 py-2.5 pl-2.5 pr-3 text-left ring-1 ring-navy-800 hover:bg-navy-800 active:bg-navy-700' + (out ? ' opacity-50' : '') + '" style="border-left-color:' + p.color + '">' +
-        K.badge(p.title, p.color) + '<span class="min-w-0 flex-1"><span class="block truncate font-semibold text-white">' + esc(p.title) + '</span>' +
+        K.badge(p.title, p.color) + '<span class="min-w-0 flex-1"><span class="block truncate font-semibold" style="color:' + K.textOnDark(p.color) + '">' + esc(p.title) + '</span>' +
         '<span class="block text-xs ' + (out ? 'text-rose-400' : 'text-slate-400') + '">' + (out ? 'Rupture de stock' : 'Stock : ' + p.stock) + '</span></span>' +
         '<span class="shrink-0 font-bold tabular-nums text-brand-300">' + fmt(p.price) + '</span></button>';
     }).join('') + '</div>';
@@ -270,7 +270,7 @@
       }
       return '<li data-line="' + p.id + '" class="rounded-xl border-l-4 bg-navy-800 p-3 transition' + (l.price != null ? ' ring-1 ring-brand-400/50' : '') + '" style="border-left-color:' + p.color + '">' +
         '<div class="flex items-start gap-3">' + K.badge(p.title, p.color, 'h-9 w-9 text-xs') + '<div class="min-w-0 flex-1">' +
-        '<p class="truncate font-semibold text-white">' + esc(p.title) + '</p>' + priceHtml + '</div>' +
+        '<p class="truncate font-semibold" style="color:' + K.textOnDark(p.color) + '">' + esc(p.title) + '</p>' + priceHtml + '</div>' +
         '<p class="shrink-0 text-lg font-bold tabular-nums text-white">' + fmt(unit * l.qty) + '</p></div>' +
         '<div class="mt-2 flex items-center gap-2">' +
         '<button type="button" class="step" data-dec="' + p.id + '" aria-label="Moins">' + ICON.minus + '</button>' +

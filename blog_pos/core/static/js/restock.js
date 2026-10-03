@@ -118,7 +118,7 @@
     if (list.length) {
       html += '<div class="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">' + list.map(function (p) {
         return '<button type="button" data-add="' + p.id + '" class="flex w-full items-center gap-3 rounded-xl border-l-4 bg-navy-900 py-2.5 pl-2.5 pr-3 text-left ring-1 ring-navy-800 hover:bg-navy-800 active:bg-navy-700" style="border-left-color:' + p.color + '">' + K.badge(p.title, p.color) +
-          '<span class="min-w-0 flex-1"><span class="block truncate font-semibold text-white">' + esc(p.title) +
+          '<span class="min-w-0 flex-1"><span class="block truncate font-semibold" style="color:' + K.textOnDark(p.color) + '">' + esc(p.title) +
           (p.active ? '' : ' <span class="rounded bg-slate-600 px-1.5 text-[10px] font-semibold uppercase text-slate-200">retiré</span>') + '</span>' +
           '<span class="block text-xs ' + (p.stock > 0 ? 'text-slate-400' : 'text-rose-400') + '">Stock : ' + p.stock +
           (p.cost ? ' · achat ' + fmt(p.cost) : ' · prix d\'achat ?') + '</span></span>' +
@@ -216,7 +216,7 @@
       var color = l.id ? catalog.byId[l.id].color : ((catalog.catColor || {})[l.newp.category_id] || '#64748b');
       return '<li data-uid="' + l.uid + '" class="rounded-xl border-l-4 bg-navy-800 p-3 transition" style="border-left-color:' + color + '">' +
         '<div class="flex items-start gap-2">' + K.badge(lineTitle(l), color, 'h-9 w-9 text-xs') + '<div class="min-w-0 flex-1">' +
-        '<p class="truncate font-semibold text-white">' + esc(lineTitle(l)) + '</p>' +
+        '<p class="truncate font-semibold" style="color:' + K.textOnDark(color) + '">' + esc(lineTitle(l)) + '</p>' +
         '<p class="text-xs text-slate-400" data-info>' + lineInfo(l) + '</p>' +
         (code ? '<p class="text-xs text-slate-500">Code-barres : ' + esc(code) + (l.id ? ' (sera associé)' : '') + '</p>' : '') +
         '</div><button type="button" data-del class="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-slate-400 hover:bg-rose-600 hover:text-white" aria-label="Retirer">' + TRASH + '</button></div>' +

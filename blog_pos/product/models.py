@@ -56,6 +56,12 @@ def initials(title):
     return letters or '?'
 
 
+def text_on_light(color, amount=0.18):
+    """Teinte assombrie pour écrire un nom sur fond blanc (lisible même pour le jaune)."""
+    color = color if color and len(color) == 7 else DEFAULT_CATEGORY_COLOR
+    return '#' + ''.join(f'{round(int(color[i:i + 2], 16) * (1 - amount)):02x}' for i in (1, 3, 5))
+
+
 class Category(SyncableMixin):
     title = models.CharField(max_length=150, unique=True)
     color = models.CharField(max_length=7, blank=True, validators=[hex_color],
@@ -141,6 +147,10 @@ class Product(SyncableMixin):
     @property
     def display_color(self):
         return self.color or (self.category.color if self.category_id else '') or DEFAULT_CATEGORY_COLOR
+
+    @property
+    def text_color(self):
+        return text_on_light(self.display_color)
 
     @property
     def initials(self):

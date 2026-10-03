@@ -56,6 +56,15 @@
   }
   // N'accepte qu'une couleur « #rrggbb » (protège l'attribut style).
   function safeColor(c) { return /^#[0-9a-fA-F]{6}$/.test(c || '') ? c : '#64748b'; }
+  // Teinte éclaircie pour écrire un nom sur fond sombre (contraste suffisant pour toutes les couleurs).
+  function textOnDark(color) {
+    var c = safeColor(color), mix = 0.45, out = '#';
+    for (var i = 1; i < 7; i += 2) {
+      var v = parseInt(c.substr(i, 2), 16);
+      out += ('0' + Math.round(v + (255 - v) * mix).toString(16)).slice(-2);
+    }
+    return out;
+  }
   function badge(title, color, cls) {
     return '<span class="grid shrink-0 place-items-center rounded-lg font-black text-white ' + (cls || 'h-10 w-10 text-sm') +
       '" style="background:' + safeColor(color) + '" aria-hidden="true">' + esc(initials(title)) + '</span>';
@@ -131,7 +140,7 @@
 
   window.WeltoKit = {
     loadJSON: loadJSON, saveJSON: saveJSON, esc: esc, norm: norm, fmt: fmt, parseMoney: parseMoney,
-    toDecimal: toDecimal, toInput: toInput, uuid: uuid, initials: initials, safeColor: safeColor, badge: badge, beep: beep, toaster: toaster, requester: requester,
+    toDecimal: toDecimal, toInput: toInput, uuid: uuid, initials: initials, safeColor: safeColor, badge: badge, textOnDark: textOnDark, beep: beep, toaster: toaster, requester: requester,
     finePointer: !!(window.matchMedia && window.matchMedia('(pointer: fine)').matches)
   };
 })();
