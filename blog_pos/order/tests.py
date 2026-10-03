@@ -151,6 +151,47 @@ class CheckoutTests(SaleTestCase):
         self.assertFalse(Order.objects.exists())
         self.assertEqual(self.qty(self.riz), 10)
 
+    def test_negotiated_price_applies_to_this_sale_only(self):
+        result = checkout(lines=[{'product_id': self.riz.pk, 'qty': 2, 'price': '23500'},
+                                 {'product_id': self.coca.pk, 'qty': 1}],
+                          user=self.user, method='cash', client_id=self.client_.pk, expected_total='49000.00')
+        order = result.order
+        riz_item = order.order_items.get(product=self.riz)
+        self.assertEqual((riz_item.final_price, riz_item.total_price), (D('23500'), D('47000')))
+        self.assertEqual(riz_item.catalog_price, D('25000'))
+        self.assertTrue(riz_item.price_overridden)
+        self.assertFalse(order.order_items.get(product=self.coca).price_overridden)
+        self.assertEqual((order.value, order.final_value, order.amount_paid), (D('49000'), D('49000'), D('49000')))
+        # La fiche produit ne change pas, et la vente suivante repart du prix normal.
+        self.riz.refresh_from_db()
+        self.assertEqual((self.riz.value, self.riz.final_value), (D('25000'), D('25000')))
+        self.assertEqual(self.sell([(self.riz, 1)]).order.final_value, D('25000'))
+
+    def test_negotiated_price_can_be_higher_and_works_with_promo(self):
+        p = self.make_product('Huile', '10000', qty=5, promo='8500')
+        item = checkout(lines=[{'product_id': p.pk, 'qty': 1, 'price': '11000'}], user=self.user,
+                        method='cash').order.order_items.get()
+        self.assertEqual((item.final_price, item.catalog_price, item.price_overridden), (D('11000'), D('8500'), True))
+
+    def test_negotiated_price_is_checked_against_displayed_total(self):
+        with self.assertRaises(SaleError) as ctx:
+            checkout(lines=[{'product_id': self.riz.pk, 'qty': 1, 'price': '23000'}], user=self.user,
+                     method='cash', expected_total='25000')
+        self.assertEqual(ctx.exception.code, 'price_changed')
+
+    def test_invalid_negotiated_prices(self):
+        for price in ['0', '-100', '12.345', 'abc', 1500.0]:
+            with self.subTest(price=price), self.assertRaises(SaleError):
+                checkout(lines=[{'product_id': self.riz.pk, 'qty': 1, 'price': price}], user=self.user, method='cash')
+        with self.assertRaises(SaleError):
+            checkout(lines=[{'product_id': self.riz.pk, 'qty': 1, 'price': '23000'},
+                            {'product_id': self.riz.pk, 'qty': 1, 'price': '24000'}], user=self.user, method='cash')
+        merged = checkout(lines=[{'product_id': self.riz.pk, 'qty': 1, 'price': '23000'},
+                                 {'product_id': self.riz.pk, 'qty': 2, 'price': '23000'}],
+                          user=self.user, method='cash').order.order_items.get()
+        self.assertEqual((merged.qty, merged.total_price), (3, D('69000')))
+        self.assertFalse(Order.objects.filter(final_value=0).exists())
+
     def test_fully_paid_sale_can_have_a_client(self):
         for method in ('cash', 'mobile', 'card'):
             with self.subTest(method=method):

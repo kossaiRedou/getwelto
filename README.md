@@ -6,7 +6,7 @@ Développée par Aliou Diallo.
 
 ## Ce que fait l'application
 
-- **Caisse sur une seule page** : scanner ou rechercher un produit, ajuster les quantités (saisie directe ou `12*` avant le nom/scan), choisir Espèces / Mobile Money / Carte / Crédit, valider. La monnaie à rendre est calculée, le ticket s'imprime sur imprimante thermique.
+- **Caisse sur une seule page** : scanner ou rechercher un produit, ajuster les quantités (saisie directe ou `12*` avant le nom/scan), modifier le prix pour un client (ne concerne que cette vente), choisir Espèces / Mobile Money / Carte / Crédit, valider. La monnaie à rendre est calculée, le ticket s'imprime sur imprimante thermique.
 - **Clients et crédits** : client optionnel ; obligatoire et proposé automatiquement pour une vente à crédit ou un paiement partiel. Suivi des dettes et encaissement des remboursements.
 - **Approvisionnement par scan**, sur le modèle de la caisse : on scanne les produits reçus, on ajuste quantité, prix d'achat et prix de vente ; un produit inconnu se crée sur place (ou son code-barres s'associe à un produit existant). Une validation = stock à jour + une dépense pour le bon.
 - **Produits et stock** : code-barres, prix promo, pertes, inventaire. Chaque mouvement est tracé avec le stock avant/après.
@@ -21,7 +21,7 @@ Développée par Aliou Diallo.
 - Une vente renvoyée deux fois (réseau coupé, double appui) n'est enregistrée qu'une fois.
 - Contraintes dans PostgreSQL : total = sous-total − remise, payé ≤ total, statut « payée » cohérent, stock jamais négatif, journal de stock cohérent.
 - Ventes, paiements et journal de stock en lecture seule dans l'admin Django.
-- 62 tests automatisés (`python manage.py test`).
+- 67 tests automatisés (`python manage.py test`).
 
 ## Légèreté
 

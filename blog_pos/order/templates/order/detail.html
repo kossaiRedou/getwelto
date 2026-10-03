@@ -21,9 +21,9 @@
           <tbody>
           {% for it in items %}
             <tr>
-              <td>{{ it.product.title }}{% if it.discount_price and it.discount_price < it.price %} <span class="badge badge-amber">promo</span>{% endif %}</td>
+              <td>{{ it.product.title }}{% if it.price_overridden %} <span class="badge badge-amber">prix modifié</span>{% elif it.discount_price and it.discount_price < it.price %} <span class="badge badge-green">promo</span>{% endif %}</td>
               <td class="num text-right">{{ it.qty }}</td>
-              <td class="num text-right">{{ it.final_price|money }}</td>
+              <td class="num text-right">{% if it.price_overridden %}<span class="block text-xs text-slate-400 line-through">{{ it.catalog_price|money }}</span>{% endif %}{{ it.final_price|money }}</td>
               <td class="num text-right font-semibold">{{ it.total_price|money }}</td>
             </tr>
           {% endfor %}

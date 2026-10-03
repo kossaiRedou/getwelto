@@ -82,19 +82,26 @@ def to_qty(value):
 
 
 def _parse_lines(lines):
-    merged = {}
+    """→ ({produit: quantité}, {produit: prix unitaire négocié ou None})."""
+    merged, prices = {}, {}
     for line in lines or []:
         try:
             product_id = int(line['product_id'])
         except (KeyError, TypeError, ValueError):
             raise SaleError('Produit invalide dans le panier.')
+        price = to_money(line.get('price'), 'Prix')
+        if price is not None and price <= 0:
+            raise SaleError('Le prix de vente doit être supérieur à 0.')
+        if product_id in merged and prices[product_id] != price:
+            raise SaleError('Un même produit apparaît deux fois avec des prix différents.')
         merged[product_id] = merged.get(product_id, 0) + to_qty(line.get('qty'))
+        prices[product_id] = price
     for qty in merged.values():
         if qty > MAX_QTY:
             raise SaleError('Quantité trop élevée.')
     if not merged:
         raise SaleError('Le panier est vide.', code='empty')
-    return merged
+    return merged, prices
 
 
 def _parse_key(sale_key):
@@ -118,8 +125,12 @@ def _sync_paid(order):
 
 def checkout(*, lines, user, method, amount=None, discount=None, client_id=None,
              expected_total=None, sale_key=None):
-    """Enregistre une vente complète. Retourne un SaleResult (vente + monnaie à rendre)."""
-    merged = _parse_lines(lines)
+    """Enregistre une vente complète. Retourne un SaleResult (vente + monnaie à rendre).
+
+    Une ligne peut porter un `price` : prix unitaire négocié pour CETTE vente
+    uniquement (prix client). La fiche produit n'est jamais modifiée.
+    """
+    merged, prices = _parse_lines(lines)
     if method != CREDIT and method not in PaymentMethod.values:
         raise SaleError('Mode de paiement invalide.')
     discount = to_money(discount, 'Remise') or ZERO
@@ -159,7 +170,8 @@ def checkout(*, lines, user, method, amount=None, discount=None, client_id=None,
                 detail = ', '.join(f"{s['title']} ({s['available']} en stock)" for s in shortages)
                 raise SaleError(f'Stock insuffisant : {detail}.', code='stock', data={'shortages': shortages})
 
-            subtotal = sum((products[pid].final_value * qty for pid, qty in merged.items()), ZERO)
+            unit = {pid: prices[pid] if prices[pid] is not None else products[pid].final_value for pid in merged}
+            subtotal = sum((unit[pid] * qty for pid, qty in merged.items()), ZERO)
             if discount > subtotal:
                 raise SaleError('La remise dépasse le montant des articles.')
             total = subtotal - discount
@@ -192,7 +204,7 @@ def checkout(*, lines, user, method, amount=None, discount=None, client_id=None,
                 OrderItem.objects.create(
                     order=order, product=product, qty=qty,
                     price=product.value, discount_price=product.discount_value,
-                    final_price=product.final_value, total_price=product.final_value * qty,
+                    final_price=unit[pid], total_price=unit[pid] * qty,
                     cost_price=product.prix_achat,
                 )
                 move_stock(pid, -qty, TypeMouvement.SORTIE_VENTE, user=user, order=order,

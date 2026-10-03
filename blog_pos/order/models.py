@@ -129,6 +129,16 @@ class OrderItem(SyncableMixin):
     def __str__(self):
         return f'{self.product.title} × {self.qty}'
 
+    @property
+    def catalog_price(self):
+        """Prix affiché au catalogue au moment de la vente (promo comprise)."""
+        return self.discount_price if self.discount_price > 0 else self.price
+
+    @property
+    def price_overridden(self):
+        """Vrai si le vendeur a fixé un autre prix pour cette vente (prix client)."""
+        return self.final_price != self.catalog_price
+
 
 class Payment(SyncableMixin):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='payments')

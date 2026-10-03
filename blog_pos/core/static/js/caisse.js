@@ -58,6 +58,7 @@
   state.saleKey = state.saleKey || null;
   var category = 0;
   var busy = false;
+  var editingPrice = null;   // produit dont le prix est en cours de modification
 
 
   // ------------------------------------------------------------- catalogue
@@ -214,11 +215,14 @@
     setTimeout(function () { node.classList.remove('ring-2', 'ring-amber-400'); }, 500);
   }
 
+  // Prix unitaire de la ligne : prix négocié pour cette vente, sinon prix catalogue.
+  function unitPrice(l, p) { return l.price != null ? l.price : p.price; }
+
   function totals() {
     var subtotal = 0, count = 0;
     state.lines.forEach(function (l) {
       var p = catalog.byId[l.id];
-      if (p) { subtotal += p.price * l.qty; count += l.qty; }
+      if (p) { subtotal += unitPrice(l, p) * l.qty; count += l.qty; }
     });
     var discount = Math.min(state.discount, subtotal);
     return { subtotal: subtotal, discount: discount, total: subtotal - discount, count: count };
@@ -238,16 +242,31 @@
     el.cartClear.classList.toggle('hidden', !state.lines.length);
     el.cartCount.textContent = t.count ? '(' + t.count + ' article' + (t.count > 1 ? 's' : '') + ')' : '';
 
-    var focused = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.qty;
-    if (focused) return;  // ne pas réécrire la ligne pendant la saisie d'une quantité
+    var active = document.activeElement && document.activeElement.dataset;
+    if (active && (active.qty || active.priceInput)) return;  // ne pas réécrire une saisie en cours
     el.cart.innerHTML = state.lines.map(function (l) {
       var p = catalog.byId[l.id];
       if (!p) return '';
-      return '<li data-line="' + p.id + '" class="rounded-xl bg-navy-800 p-3 transition">' +
+      var unit = unitPrice(l, p);
+      var priceHtml;
+      if (editingPrice === p.id) {
+        priceHtml = '<span class="mt-1 flex items-center gap-2">' +
+          '<input data-price-input="' + p.id + '" value="' + K.toInput(unit) + '" inputmode="decimal" aria-label="Prix pour cette vente" ' +
+          'class="h-9 w-32 rounded-lg border-2 border-amber-400 bg-navy-950 px-2 text-right font-bold text-white focus:outline-none">' +
+          '<span class="text-xs text-slate-400">pour cette vente</span></span>';
+      } else {
+        priceHtml = '<span class="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm">' +
+          (l.price != null ? '<span class="text-slate-500 line-through">' + fmt(p.price) + '</span>' : '') +
+          '<button type="button" data-price="' + p.id + '" class="-ml-1.5 rounded-md px-1.5 py-1 font-semibold underline decoration-dotted underline-offset-2 hover:bg-navy-700 ' +
+          (l.price != null ? 'text-amber-300' : 'text-slate-300') + '" title="Modifier le prix pour cette vente">' + fmt(unit) + ' ✎</button>' +
+          '<span class="text-slate-400">× ' + l.qty + '</span>' +
+          (l.price != null ? '<button type="button" data-reset-price="' + p.id + '" class="rounded-md px-1.5 py-0.5 text-slate-400 hover:bg-navy-700 hover:text-white">↺ prix normal</button>' : '') +
+          '</span>';
+      }
+      return '<li data-line="' + p.id + '" class="rounded-xl bg-navy-800 p-3 transition' + (l.price != null ? ' ring-1 ring-amber-500/40' : '') + '">' +
         '<div class="flex items-start gap-3"><div class="min-w-0 flex-1">' +
-        '<p class="truncate font-semibold text-white">' + esc(p.title) + '</p>' +
-        '<p class="text-xs text-slate-400">' + fmt(p.price) + ' × ' + l.qty + '</p></div>' +
-        '<p class="shrink-0 text-lg font-bold tabular-nums text-white">' + fmt(p.price * l.qty) + '</p></div>' +
+        '<p class="truncate font-semibold text-white">' + esc(p.title) + '</p>' + priceHtml + '</div>' +
+        '<p class="shrink-0 text-lg font-bold tabular-nums text-white">' + fmt(unit * l.qty) + '</p></div>' +
         '<div class="mt-2 flex items-center gap-2">' +
         '<button type="button" class="step" data-dec="' + p.id + '" aria-label="Moins">' + ICON.minus + '</button>' +
         '<input data-qty="' + p.id + '" value="' + l.qty + '" inputmode="numeric" pattern="[0-9]*" aria-label="Quantité" ' +
@@ -338,7 +357,9 @@
     request(URLS.checkout, {
       timeout: 45000,
       body: {
-        lines: state.lines.map(function (l) { return { product_id: l.id, qty: l.qty }; }),
+        lines: state.lines.map(function (l) {
+          return { product_id: l.id, qty: l.qty, price: l.price != null ? toDecimal(l.price) : null };
+        }),
         method: state.method,
         amount: amount === null ? null : toDecimal(amount),
         discount: toDecimal(t.discount),
@@ -498,23 +519,56 @@
     renderResults();
   });
 
+  // Prix négocié : ne concerne que cette vente, la fiche produit ne change pas.
+  function applyPrice(id, raw) {
+    var l = line(id), p = catalog.byId[id];
+    editingPrice = null;
+    if (!l || !p) return render();
+    var cents = parseMoney(raw);
+    if (cents === null || cents === p.price) {
+      delete l.price;
+    } else if (isNaN(cents) || cents <= 0) {
+      toast('Prix invalide : il doit être supérieur à 0.');
+    } else {
+      l.price = cents;
+    }
+    changed();
+  }
+
   el.cart.addEventListener('click', function (e) {
     var b = e.target.closest('button');
     if (!b) return;
     if (b.dataset.inc) { var l1 = line(+b.dataset.inc); setQty(+b.dataset.inc, l1.qty + 1); }
     else if (b.dataset.dec) { var l2 = line(+b.dataset.dec); if (l2.qty > 1) setQty(+b.dataset.dec, l2.qty - 1); }
     else if (b.dataset.del) removeLine(+b.dataset.del);
+    else if (b.dataset.price) {
+      editingPrice = +b.dataset.price;
+      render();
+      var input = el.cart.querySelector('[data-price-input="' + editingPrice + '"]');
+      if (input) { input.focus(); input.select(); }
+    } else if (b.dataset.resetPrice) {
+      delete line(+b.dataset.resetPrice).price;
+      changed();
+    }
   });
   el.cart.addEventListener('focusin', function (e) {
     if (e.target.dataset.qty) e.target.select();
   });
   el.cart.addEventListener('keydown', function (e) {
-    if (e.target.dataset.qty && e.key === 'Enter') e.target.blur();
+    if ((e.target.dataset.qty || e.target.dataset.priceInput) && e.key === 'Enter') e.target.blur();
+    if (e.target.dataset.priceInput && e.key === 'Escape') { editingPrice = null; e.target.blur(); }
   });
   el.cart.addEventListener('focusout', function (e) {
-    if (!e.target.dataset.qty) return;
-    var qty = parseInt(e.target.value.replace(/\D/g, ''), 10);
-    var id = +e.target.dataset.qty;
+    var target = e.target;
+    if (target.dataset.priceInput) {
+      var pid = +target.dataset.priceInput;
+      if (editingPrice === null) { setTimeout(render, 0); return; }   // Échap : annulé
+      setTimeout(function () { applyPrice(pid, target.value); }, 0);
+      return;
+    }
+    if (!target.dataset.qty) return;
+    var qty = parseInt(target.value.replace(/\D/g, ''), 10);
+    var id = +target.dataset.qty;
     setTimeout(function () { setQty(id, qty); }, 0);
   });
 
