@@ -6,7 +6,7 @@ from io import BytesIO
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.db.models import Count, F, Max, Q, Sum
+from django.db.models import Count, F, Q, Sum
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
@@ -36,27 +36,27 @@ def pos_view(request):
 @require_GET
 @api_login_required
 def api_catalog(request):
-    """Catalogue compact de la caisse, mis en cache par le navigateur (ETag → 304)."""
-    products = Product.objects.filter(active=True)
-    state = products.aggregate(n=Count('id'), last=Max('updated_at'))
-    cat_state = Category.objects.aggregate(n=Count('id'), last=Max('updated_at'))
-    settings_obj = AppSetting.get_solo()
-    fingerprint = f"{state}|{cat_state}|{settings_obj.currency_label}|{settings_obj.updated_at}"
-    etag = '"' + hashlib.md5(fingerprint.encode()).hexdigest() + '"'
-    # GZipMiddleware rend l'ETag « faible » (W/"…") : on compare sans ce préfixe.
-    if request.headers.get('If-None-Match', '').replace('W/', '') == etag:
-        response = HttpResponse(status=304)
-        response['ETag'] = etag
-        return response
+    """Catalogue compact de la caisse, mis en cache par le navigateur (ETag → 304).
 
-    rows = products.order_by('title').values_list('id', 'title', 'barcode', 'final_value', 'qty', 'category_id')
+    L'ETag est l'empreinte du contenu lui-même (prix, stocks…) : tout changement,
+    même deux modifications dans la même milliseconde, produit un nouvel ETag.
+    Le gain est sur le réseau : un catalogue inchangé ne fait que quelques octets.
+    """
+    rows = (Product.objects.filter(active=True).order_by('title')
+            .values_list('id', 'title', 'barcode', 'final_value', 'qty', 'category_id'))
     data = {
-        'currency': settings_obj.currency_label,
+        'currency': AppSetting.get_currency_label(),
         'products': [[pid, title, barcode or '', to_cents(price), qty, cat or 0]
                      for pid, title, barcode, price, qty, cat in rows],
         'categories': list(Category.objects.order_by('title').values_list('id', 'title')),
     }
-    response = JsonResponse(data, json_dumps_params={'separators': (',', ':'), 'ensure_ascii': False})
+    body = json.dumps(data, separators=(',', ':'), ensure_ascii=False)
+    etag = '"' + hashlib.md5(body.encode()).hexdigest() + '"'
+    # GZipMiddleware rend l'ETag « faible » (W/"…") : on compare sans ce préfixe.
+    if request.headers.get('If-None-Match', '').replace('W/', '') == etag:
+        response = HttpResponse(status=304)
+    else:
+        response = HttpResponse(body, content_type='application/json')
     response['ETag'] = etag
     response['Cache-Control'] = 'private, no-cache'
     return response
