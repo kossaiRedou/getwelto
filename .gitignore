@@ -33,20 +33,3 @@ tailwindcss.exe
 .idea/
 .DS_Store
 Thumbs.db
-
-# Anciens fichiers de la version desktop / cloud (à supprimer du disque)
-cloud_server/
-desktop_app/
-build/
-dist/
-scripts/
-*.spec
-build_standalone.py
-blog_pos/Welto.py
-blog_pos/sync/
-blog_pos/licensing/
-blog_pos/order/static/
-blog_pos/order/templates/source/
-
-# Sauvegarde de l'ancien historique git (version desktop)
-.git_ancien/
