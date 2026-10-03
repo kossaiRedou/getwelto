@@ -32,3 +32,17 @@ def api_login_required(view_func):
                                 status=401)
         return view_func(request, *args, **kwargs)
     return wrapper
+
+
+def api_manager_required(view_func):
+    """API réservée au manager : 401 si non connecté, 403 sinon."""
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return JsonResponse({'ok': False, 'code': 'auth', 'error': 'Session expirée. Reconnectez-vous.'},
+                                status=401)
+        if not is_manager(request.user):
+            return JsonResponse({'ok': False, 'code': 'forbidden', 'error': 'Accès réservé au manager.'},
+                                status=403)
+        return view_func(request, *args, **kwargs)
+    return wrapper

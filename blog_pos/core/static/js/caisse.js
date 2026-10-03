@@ -20,8 +20,7 @@
     clientCreate: root.dataset.clientCreateUrl,
     login: root.dataset.loginUrl
   };
-  var CSRF = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
-  var FINE_POINTER = window.matchMedia && window.matchMedia('(pointer: fine)').matches;
+  var FINE_POINTER = window.WeltoKit.finePointer;
   var STORE_CATALOG = 'welto.catalog.v1';
   var STORE_CART = 'welto.cart.v1';
 
@@ -39,6 +38,15 @@
     done: $('done')
   };
 
+  // Outils partagés (kit.js) : montants en centimes, requêtes, alertes.
+  var K = window.WeltoKit;
+  var loadJSON = K.loadJSON, saveJSON = K.saveJSON, esc = K.esc, norm = K.norm, fmt = K.fmt,
+      parseMoney = K.parseMoney, toDecimal = K.toDecimal, uuid = K.uuid, beep = K.beep;
+  var toast = K.toaster(el.toast);
+  function setOnline(on) { el.net.classList.toggle('hidden', on); }
+  var request = K.requester({ loginUrl: URLS.login, toast: toast, onNetwork: setOnline });
+  function persist() { saveJSON(STORE_CART, state); }
+
   // ------------------------------------------------------------------ état
   var catalog = { products: [], byId: {}, byBarcode: {}, categories: [] };
   var state = loadJSON(STORE_CART) || {};
@@ -51,109 +59,6 @@
   var category = 0;
   var busy = false;
 
-  // ------------------------------------------------------------ utilitaires
-  function loadJSON(key) {
-    try { return JSON.parse(localStorage.getItem(key)); } catch (e) { return null; }
-  }
-  function saveJSON(key, value) {
-    try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { /* stockage plein */ }
-  }
-  function persist() { saveJSON(STORE_CART, state); }
-
-  function esc(s) {
-    return String(s).replace(/[&<>"']/g, function (c) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-    });
-  }
-  function norm(s) {
-    return String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-  }
-
-  // 3800000 → « 38 000 » ; 125050 → « 1 250,50 »
-  function fmt(cents) {
-    var neg = cents < 0;
-    cents = Math.abs(cents);
-    var units = Math.floor(cents / 100);
-    var rest = cents % 100;
-    var s = String(units).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-    if (rest) s += ',' + (rest < 10 ? '0' : '') + rest;
-    return (neg ? '-' : '') + s;
-  }
-  // « 38 000 », « 1250,5 » → centimes ; '' → null ; saisie invalide → NaN
-  function parseMoney(str) {
-    str = String(str || '').replace(/[\s  ]/g, '');
-    if (!str) return null;
-    var m = str.match(/^(\d{1,15})(?:[.,](\d{0,2}))?$/);
-    if (!m) return NaN;
-    var dec = (m[2] || '') + '00';
-    return parseInt(m[1], 10) * 100 + parseInt(dec.slice(0, 2), 10);
-  }
-  // centimes → « 38000.00 » pour le serveur (texte, pas de nombre à virgule)
-  function toDecimal(cents) {
-    var rest = cents % 100;
-    return Math.floor(cents / 100) + '.' + (rest < 10 ? '0' : '') + rest;
-  }
-  function uuid() {
-    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
-    var b = new Uint8Array(16);
-    crypto.getRandomValues(b);
-    b[6] = (b[6] & 15) | 64; b[8] = (b[8] & 63) | 128;
-    var h = Array.prototype.map.call(b, function (x) { return (x + 256).toString(16).slice(1); }).join('');
-    return h.slice(0, 8) + '-' + h.slice(8, 12) + '-' + h.slice(12, 16) + '-' + h.slice(16, 20) + '-' + h.slice(20);
-  }
-
-  var toastTimer;
-  function toast(message, kind) {
-    var colors = kind === 'ok' ? 'bg-emerald-600 text-white' : kind === 'warn' ? 'bg-amber-400 text-navy-950' : 'bg-rose-600 text-white';
-    el.toast.className = 'fixed inset-x-3 top-16 z-[60] mx-auto max-w-md rounded-xl px-4 py-3 text-sm font-semibold shadow-xl lg:top-4 ' + colors;
-    el.toast.textContent = message;
-    el.toast.hidden = false;
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { el.toast.hidden = true; }, kind === 'ok' ? 2500 : 6000);
-  }
-  function beep(ok) {
-    try {
-      var ctx = beep.ctx || (beep.ctx = new (window.AudioContext || window.webkitAudioContext)());
-      var o = ctx.createOscillator(), g = ctx.createGain();
-      o.frequency.value = ok ? 1200 : 300;
-      g.gain.value = 0.05;
-      o.connect(g); g.connect(ctx.destination);
-      o.start(); o.stop(ctx.currentTime + (ok ? 0.06 : 0.25));
-    } catch (e) { /* pas de son */ }
-  }
-
-  function request(url, options) {
-    options = options || {};
-    var controller = window.AbortController ? new AbortController() : null;
-    var timer = controller && setTimeout(function () { controller.abort(); }, options.timeout || 30000);
-    var headers = options.headers || {};
-    headers['X-Requested-With'] = 'XMLHttpRequest';
-    if (options.body) {
-      headers['Content-Type'] = 'application/json';
-      headers['X-CSRFToken'] = CSRF;
-    }
-    return fetch(url, {
-      method: options.body ? 'POST' : 'GET',
-      headers: headers,
-      body: options.body ? JSON.stringify(options.body) : undefined,
-      credentials: 'same-origin',
-      signal: controller ? controller.signal : undefined
-    }).then(function (r) {
-      clearTimeout(timer);
-      setOnline(true);
-      if (r.status === 401) {
-        toast('Session expirée : reconnexion…');
-        setTimeout(function () { location.href = URLS.login + '?next=/'; }, 1500);
-        throw { handled: true };
-      }
-      return r;
-    }, function (err) {
-      clearTimeout(timer);
-      setOnline(false);
-      throw err;
-    });
-  }
-  function setOnline(on) { el.net.classList.toggle('hidden', on); }
 
   // ------------------------------------------------------------- catalogue
   function applyCatalog(data) {

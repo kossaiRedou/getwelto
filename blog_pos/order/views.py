@@ -1,5 +1,4 @@
 import datetime
-import hashlib
 import json
 from io import BytesIO
 
@@ -15,7 +14,7 @@ from django.views.decorators.http import require_GET, require_POST
 
 from aprovision.models import Depense
 from core.decorators import api_login_required, manager_required
-from core.utils import format_money, parse_iso_date, to_cents
+from core.utils import format_money, json_etag_response, parse_iso_date, to_cents
 from product.models import Category, Product, get_low_stock_threshold
 from users.models import AppSetting
 from . import services
@@ -36,30 +35,15 @@ def pos_view(request):
 @require_GET
 @api_login_required
 def api_catalog(request):
-    """Catalogue compact de la caisse, mis en cache par le navigateur (ETag → 304).
-
-    L'ETag est l'empreinte du contenu lui-même (prix, stocks…) : tout changement,
-    même deux modifications dans la même milliseconde, produit un nouvel ETag.
-    Le gain est sur le réseau : un catalogue inchangé ne fait que quelques octets.
-    """
+    """Catalogue compact de la caisse, mis en cache par le navigateur (ETag → 304)."""
     rows = (Product.objects.filter(active=True).order_by('title')
             .values_list('id', 'title', 'barcode', 'final_value', 'qty', 'category_id'))
-    data = {
+    return json_etag_response(request, {
         'currency': AppSetting.get_currency_label(),
         'products': [[pid, title, barcode or '', to_cents(price), qty, cat or 0]
                      for pid, title, barcode, price, qty, cat in rows],
         'categories': list(Category.objects.order_by('title').values_list('id', 'title')),
-    }
-    body = json.dumps(data, separators=(',', ':'), ensure_ascii=False)
-    etag = '"' + hashlib.md5(body.encode()).hexdigest() + '"'
-    # GZipMiddleware rend l'ETag « faible » (W/"…") : on compare sans ce préfixe.
-    if request.headers.get('If-None-Match', '').replace('W/', '') == etag:
-        response = HttpResponse(status=304)
-    else:
-        response = HttpResponse(body, content_type='application/json')
-    response['ETag'] = etag
-    response['Cache-Control'] = 'private, no-cache'
-    return response
+    })
 
 
 @require_POST

@@ -8,6 +8,7 @@
   {% if is_mgr %}
   <div class="flex gap-2">
     <a href="{% url 'product:category_management' %}" class="btn btn-light">{% icon 'folder' 'h-4 w-4' %} Catégories</a>
+    <a href="{% url 'product:restock' %}" class="btn btn-dark">{% icon 'truck' 'h-4 w-4' %} Approvisionner</a>
     <a href="{% url 'product:add_product' %}" class="btn btn-primary">{% icon 'plus' 'h-4 w-4' %} Ajouter</a>
   </div>
   {% endif %}

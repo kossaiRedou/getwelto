@@ -1,14 +1,20 @@
+import json
+import uuid
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import ProtectedError, Q
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 
 from aprovision.models import MouvementStock
-from aprovision.services import StockError, adjust_stock, restock
-from core.decorators import manager_required
+from aprovision.services import StockError, adjust_stock, receive, restock
+from core.decorators import api_manager_required, manager_required
+from core.utils import json_etag_response, to_cents
+from users.models import AppSetting
 from .forms import CategoryForm, ProductForm, StockForm
 from .models import Category, Product, get_low_stock_threshold
 
@@ -142,3 +148,45 @@ def category_delete(request, pk):
     category.delete()
     messages.success(request, f'Catégorie « {category.title} » supprimée (ses produits restent, sans catégorie).')
     return redirect('product:category_management')
+
+
+# ---------------------------------------------------------------- Approvisionnement (réception)
+
+@manager_required
+def restock_page(request):
+    return render(request, 'product/restock.html', {'categories': Category.objects.all()})
+
+
+@require_GET
+@api_manager_required
+def api_stock_catalog(request):
+    """Catalogue de la réception : tous les produits (même retirés de la vente), avec prix d'achat."""
+    rows = Product.objects.order_by('title').values_list(
+        'id', 'title', 'barcode', 'value', 'qty', 'category_id', 'prix_achat', 'active', 'discount_value')
+    return json_etag_response(request, {
+        'currency': AppSetting.get_currency_label(),
+        'products': [[pid, title, barcode or '', to_cents(value), qty, cat or 0, to_cents(cost),
+                      1 if active else 0, to_cents(promo)]
+                     for pid, title, barcode, value, qty, cat, cost, active, promo in rows],
+        'categories': list(Category.objects.order_by('title').values_list('id', 'title')),
+    })
+
+
+@require_POST
+@api_manager_required
+def api_receive(request):
+    try:
+        payload = json.loads(request.body or b'{}')
+        key = uuid.UUID(str(payload['key'])) if payload.get('key') else None
+    except (ValueError, KeyError):
+        return JsonResponse({'ok': False, 'error': 'Requête invalide.'}, status=400)
+    try:
+        result = receive(payload.get('lines'), user=request.user, key=key,
+                         fournisseur=str(payload.get('fournisseur') or ''),
+                         reference=str(payload.get('reference') or ''))
+    except StockError as exc:
+        return JsonResponse({'ok': False, 'error': str(exc)}, status=400)
+    if result is None:
+        return JsonResponse({'ok': True, 'replayed': True})
+    return JsonResponse({'ok': True, 'replayed': False, 'lines': result['lines'], 'units': result['units'],
+                         'created': result['created'], 'total': to_cents(result['total'])})
