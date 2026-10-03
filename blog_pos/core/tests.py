@@ -154,3 +154,86 @@ class PagesTests(TestCase):
         self.client.force_login(self.employee)
         self.assertEqual(self.client.get(reverse('users:logout')).status_code, 405)
         self.assertRedirects(self.client.post(reverse('users:logout')), reverse('users:login'))
+
+
+class LoginThrottleTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user('awa', password='bon-mot-de-passe', role='employee', first_name='Awa')
+
+    def setUp(self):
+        from django.core.cache import cache
+        cache.clear()
+        SetupMiddleware.setup_done = False
+
+    def login(self, password, username='awa'):
+        return self.client.post(reverse('users:login'), {'username': username, 'password': password})
+
+    def test_lock_after_five_failures_even_with_good_password(self):
+        for _ in range(5):
+            self.assertEqual(self.login('faux').status_code, 200)
+        r = self.login('bon-mot-de-passe')
+        self.assertEqual(r.status_code, 429)
+        self.assertNotIn('_auth_user_id', self.client.session)
+
+    def test_lock_also_protects_admin_login(self):
+        for _ in range(5):
+            self.login('faux')
+        r = self.client.post('/admin/login/', {'username': 'awa', 'password': 'bon-mot-de-passe'})
+        self.assertNotIn('_auth_user_id', self.client.session)
+        self.assertEqual(r.status_code, 200)
+
+    def test_success_resets_counter(self):
+        for _ in range(4):
+            self.login('faux')
+        self.assertEqual(self.login('bon-mot-de-passe').status_code, 302)
+        self.client.logout()
+        for _ in range(4):
+            self.login('faux')
+        self.assertEqual(self.login('bon-mot-de-passe').status_code, 302)
+
+    def test_lock_per_ip_across_usernames(self):
+        for i in range(20):
+            self.login('faux', username=f'inconnu{i}')
+        self.assertEqual(self.login('bon-mot-de-passe').status_code, 429)
+
+
+class ProductionSettingsTests(TestCase):
+    def run_settings(self, **env):
+        import os
+        import subprocess
+        import sys
+        base = {k: v for k, v in os.environ.items() if k not in (
+            'DATABASE_URL', 'SECRET_KEY', 'ALLOWED_HOSTS', 'CSRF_TRUSTED_ORIGINS', 'DEBUG')}
+        base.update(env, WELTO_ENV='production', PYTHONIOENCODING='utf-8')
+        return subprocess.run([sys.executable, '-c', 'import blog_pos.settings'], env=base,
+                              capture_output=True, text=True, encoding='utf-8',
+                              cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+    def test_missing_variables_refuse_to_start(self):
+        r = self.run_settings()
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn('DATABASE_URL', r.stderr)
+
+    def test_complete_configuration_starts(self):
+        r = self.run_settings(DATABASE_URL='postgres://u:p@h:5432/db', SECRET_KEY='x' * 50,
+                              ALLOWED_HOSTS='caisse.exemple.com', CSRF_TRUSTED_ORIGINS='https://caisse.exemple.com',
+                              DEBUG='False')
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_debug_refused(self):
+        r = self.run_settings(DATABASE_URL='postgres://u:p@h:5432/db', SECRET_KEY='x' * 50,
+                              ALLOWED_HOSTS='a.com', CSRF_TRUSTED_ORIGINS='https://a.com', DEBUG='True')
+        self.assertNotEqual(r.returncode, 0)
+
+
+class ErrorPagesTests(TestCase):
+    def test_404_in_french(self):
+        from django.test import override_settings
+        with override_settings(DEBUG=False):
+            r = self.client.get('/sales/999999/', follow=True)
+        self.assertContains(r, 'Page introuvable', status_code=404) if r.status_code == 404 else None
+        from django.template.loader import render_to_string
+        for name, text in [('404.html', 'Page introuvable'), ('500.html', 'Une erreur est survenue'),
+                           ('403_csrf.html', 'La page a expiré')]:
+            self.assertIn(text, render_to_string(name))

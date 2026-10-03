@@ -1,0 +1,6 @@
+{% extends 'error_base.html' %}
+{% block title %}Page expirée{% endblock %}
+{% block code %}⟳{% endblock %}
+{% block heading %}La page a expiré{% endblock %}
+{% block message %}Pour votre sécurité, ce formulaire n'est plus valide (page ouverte depuis longtemps ou session terminée). Rien n'a été enregistré : rechargez la page puis recommencez.{% endblock %}
+{% block actions %}<a href="javascript:history.back()" class="btn btn-light">Revenir en arrière</a><a href="/" class="btn btn-primary">Retour à la caisse</a>{% endblock %}

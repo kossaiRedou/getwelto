@@ -18,22 +18,25 @@ Dans Coolify : **Project → + New → Database → PostgreSQL 16**.
 
 - **Build Pack** : `Dockerfile` (le fichier est à la racine du dépôt).
 - **Port** : `8000`.
+- **Health check** : chemin `/healthz` (déjà déclaré dans le Dockerfile).
 - **Domaine** : `https://caisse.maboutique.com`.
 
 ## 3. Variables d'environnement
 
 Onglet **Environment Variables** :
 
-| Variable | Valeur |
-|---|---|
-| `DATABASE_URL` | l'URL interne copiée à l'étape 1 |
-| `SECRET_KEY` | une valeur aléatoire : `python -c "import secrets; print(secrets.token_urlsafe(50))"` |
-| `DEBUG` | `False` |
-| `ALLOWED_HOSTS` | `caisse.maboutique.com` |
-| `CSRF_TRUSTED_ORIGINS` | `https://caisse.maboutique.com` |
-| `WELTO_HTTPS` | `true` |
-| `TIME_ZONE` | `Africa/Conakry` (Guinée) ou `Africa/Banjul` (Gambie) |
-| `EMAIL_HOST`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` | optionnel, pour le mot de passe oublié |
+| Variable | Valeur | |
+|---|---|---|
+| `DATABASE_URL` | l'URL interne copiée à l'étape 1 | obligatoire |
+| `SECRET_KEY` | 50 caractères aléatoires : `python -c "import secrets; print(secrets.token_urlsafe(50))"` | obligatoire (40 car. min.) |
+| `ALLOWED_HOSTS` | `caisse.maboutique.com` | obligatoire |
+| `CSRF_TRUSTED_ORIGINS` | `https://caisse.maboutique.com` | obligatoire |
+| `TIME_ZONE` | `Africa/Conakry` (Guinée) ou `Africa/Banjul` (Gambie) | recommandé |
+| `WEB_CONCURRENCY` | `2` (défaut) : suffisant pour une boutique ; augmenter seulement si le VPS a de la mémoire libre | facultatif |
+| `EMAIL_HOST`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` | pour le mot de passe oublié | facultatif |
+
+L'image fonctionne d'office en mode production : `DEBUG` désactivé, HTTPS (cookies sécurisés, HSTS), fichier `.env` ignoré.
+**Si une variable obligatoire manque, l'application refuse de démarrer** et le journal du conteneur indique laquelle — c'est voulu, pour ne jamais tourner avec une configuration incomplète (par exemple sans PostgreSQL).
 
 Ne changez jamais `SECRET_KEY` après la mise en service : toutes les sessions seraient déconnectées.
 
@@ -57,6 +60,20 @@ Ouvrir `https://caisse.maboutique.com` : la page **Bienvenue** demande le nom de
 3. **SSL/TLS → Edge Certificates** : activer **Always Use HTTPS**.
 4. **Speed → Optimization** : laisser Brotli actif. Ne pas activer Rocket Loader : il retarde le JavaScript de la caisse.
 5. **Caching** : rien à configurer. Les fichiers `/static/` ont des noms uniques et un cache d'un an : Cloudflare les sert depuis l'Afrique de l'Ouest sans repasser par le VPS.
+
+## 7. Vérifications après la mise en ligne
+
+1. `https://caisse.maboutique.com/healthz` affiche `ok`.
+2. La page **Bienvenue** s'affiche : créer la boutique et le compte du gérant.
+3. Créer 2 ou 3 produits, faire une vente test puis l'**annuler** (Ventes → la vente → Annuler) : le stock revient à sa valeur.
+4. Sur la tablette : ouvrir la caisse, tester la douchette et le bouton appareil photo (le navigateur demande l'autorisation la première fois).
+5. Dans la base PostgreSQL de Coolify, lancer une première sauvegarde manuelle (**Backup now**).
+
+## Sécurité en place
+
+- Connexion bloquée 15 minutes après 5 mots de passe faux sur un même identifiant (ou 20 depuis une même adresse), y compris sur `/admin/`. Le gérant peut réinitialiser le mot de passe d'un employé dans **Utilisateurs**.
+- Une session reste ouverte 7 jours sans activité ; penser à se déconnecter d'une tablette partagée ou perdue.
+- Pages d'erreur et « page expirée » en français, sans détail technique.
 
 ## Mises à jour
 

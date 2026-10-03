@@ -413,3 +413,71 @@ class ApiTests(SaleTestCase):
         self.sell([(self.riz, 1)], method='credit', client_id=self.client_.pk)
         found = self.client.get(reverse('client:api_search'), {'q': 'mamadou'}).json()['clients']
         self.assertEqual(found[0]['debt'], 2500000)
+
+
+from django.db import connection
+from django.test import TransactionTestCase
+import threading
+import unittest
+
+
+@unittest.skipUnless(connection.vendor == 'postgresql', 'verrouillage réel des lignes : PostgreSQL uniquement')
+class ConcurrencyTests(TransactionTestCase):
+    """Deux caisses vendent en même temps : le verrou empêche toute survente."""
+
+    def setUp(self):
+        self.user = User.objects.create_user('caisse', password='x' * 10, role='employee')
+        self.client_ = Client.objects.create(name='Mamadou', phone='622000001')
+
+    def race(self, target, n=2):
+        barrier = threading.Barrier(n)
+        results = []
+
+        def run(i):
+            try:
+                barrier.wait()
+                results.append(('ok', target(i)))
+            except Exception as exc:   # noqa: BLE001 — on veut le résultat de chaque caisse
+                results.append(('err', exc))
+            finally:
+                connection.close()
+        threads = [threading.Thread(target=run, args=(i,)) for i in range(n)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        return results
+
+    def test_last_item_sold_only_once(self):
+        product = Product.objects.create(title='Dernier riz', value=D('25000'))
+        adjust_stock(product.pk, 'add', 1)
+        results = self.race(lambda i: checkout(lines=[{'product_id': product.pk, 'qty': 1}],
+                                               user=self.user, method='cash'))
+        self.assertEqual(sorted(kind for kind, _ in results), ['err', 'ok'])
+        error = next(value for kind, value in results if kind == 'err')
+        self.assertIsInstance(error, SaleError)
+        product.refresh_from_db()
+        self.assertEqual(product.qty, 0)
+        self.assertEqual(Order.objects.count(), 1)
+        self.assertEqual(MouvementStock.objects.filter(type_mouvement=TypeMouvement.SORTIE_VENTE).count(), 1)
+
+    def test_same_sale_sent_twice_at_once_is_recorded_once(self):
+        product = Product.objects.create(title='Savon', value=D('3000'))
+        adjust_stock(product.pk, 'add', 10)
+        key = str(uuid.uuid4())
+        results = self.race(lambda i: checkout(lines=[{'product_id': product.pk, 'qty': 2}],
+                                               user=self.user, method='cash', sale_key=key))
+        self.assertTrue(all(kind == 'ok' for kind, _ in results), results)
+        self.assertEqual(Order.objects.count(), 1)
+        product.refresh_from_db()
+        self.assertEqual(product.qty, 8)
+
+    def test_concurrent_debt_payments_never_exceed_total(self):
+        product = Product.objects.create(title='Huile', value=D('12000'))
+        adjust_stock(product.pk, 'add', 5)
+        order = checkout(lines=[{'product_id': product.pk, 'qty': 1}], user=self.user, method='credit',
+                         client_id=self.client_.pk).order
+        results = self.race(lambda i: services.add_payment(order.pk, '12000', 'cash', user=self.user))
+        self.assertEqual(sorted(kind for kind, _ in results), ['err', 'ok'])
+        order.refresh_from_db()
+        self.assertEqual((order.amount_paid, order.is_paid), (D('12000'), True))

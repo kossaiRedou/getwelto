@@ -1,0 +1,25 @@
+{% load static %}<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#121433">
+  <title>{% block title %}{% endblock %} · WELTO</title>
+  <link rel="icon" href="{% static 'img/favicon.svg' %}" type="image/svg+xml">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+</head>
+<body class="min-h-dvh bg-navy-950 bg-[radial-gradient(ellipse_at_top,var(--color-brand-800),transparent_60%)]">
+  <main class="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-4 py-10 text-center">
+    <div class="mb-8 flex items-center justify-center gap-3">
+      <span class="logo-mark h-11 w-11 text-xl">W</span>
+      <span class="text-xl font-bold tracking-tight text-white">WELTO</span>
+    </div>
+    <div class="rounded-3xl bg-white p-6 shadow-2xl shadow-black/30 sm:p-8">
+      <p class="text-5xl font-black text-brand-600">{% block code %}{% endblock %}</p>
+      <h1 class="mt-3 text-lg font-bold text-slate-900">{% block heading %}{% endblock %}</h1>
+      <p class="mt-2 text-sm text-slate-600">{% block message %}{% endblock %}</p>
+      <div class="mt-6 flex flex-wrap justify-center gap-2">{% block actions %}<a href="/" class="btn btn-primary">Retour à la caisse</a>{% endblock %}</div>
+    </div>
+  </main>
+</body>
+</html>

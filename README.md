@@ -21,7 +21,7 @@ Développée par Aliou Diallo.
 - Une vente renvoyée deux fois (réseau coupé, double appui) n'est enregistrée qu'une fois.
 - Contraintes dans PostgreSQL : total = sous-total − remise, payé ≤ total, statut « payée » cohérent, stock jamais négatif, journal de stock cohérent.
 - Ventes, paiements et journal de stock en lecture seule dans l'admin Django.
-- 67 tests automatisés (`python manage.py test`).
+- 89 tests automatisés (`python manage.py test`), validés sur PostgreSQL 16, dont des tests de ventes simultanées.
 
 ## Légèreté
 

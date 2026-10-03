@@ -4,16 +4,33 @@ import sys
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Charger les variables d'environnement depuis .env (absent en production Docker :
-# la configuration y est fournie par les variables d'environnement de Coolify).
+# En développement, la configuration vient de blog_pos/.env. En production
+# (WELTO_ENV=production, posé par l'image Docker), uniquement des variables
+# d'environnement de Coolify : un .env oublié dans l'image est ignoré.
 env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
-if os.path.exists(env_path):
+if os.path.exists(env_path) and os.getenv('WELTO_ENV', '').lower() != 'production':
     # override=True : le .env du projet fait autorité sur les variables
     # ambiantes (ex: DEBUG=* posé globalement par l'écosystème npm/debug).
     load_dotenv(env_path, override=True)
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TESTING = len(sys.argv) > 1 and sys.argv[1] == 'test'
+
+# WELTO_ENV=production est posé par l'image Docker : l'application refuse alors de
+# démarrer si un réglage indispensable manque, plutôt que de tourner en mode dégradé
+# (base SQLite dans le conteneur, domaine refusé…).
+PRODUCTION = os.getenv('WELTO_ENV', '').lower() == 'production'
+if PRODUCTION:
+    from django.core.exceptions import ImproperlyConfigured
+    _missing = [name for name in ('DATABASE_URL', 'SECRET_KEY', 'ALLOWED_HOSTS', 'CSRF_TRUSTED_ORIGINS')
+                if not os.getenv(name, '').strip()]
+    if _missing:
+        raise ImproperlyConfigured("Variables d'environnement manquantes en production : " + ', '.join(_missing)
+                                   + '. Voir DEPLOY.md, étape 3.')
+    if os.getenv('DEBUG', 'False').lower() == 'true':
+        raise ImproperlyConfigured('DEBUG doit valoir False en production.')
+    if len(os.getenv('SECRET_KEY', '')) < 40:
+        raise ImproperlyConfigured('SECRET_KEY trop courte : 40 caractères aléatoires minimum.')
 
 # Dossier de données persistantes (volume Docker /data en production)
 USER_DATA_PATH = os.getenv('WELTO_USER_DATA', None)
@@ -112,6 +129,7 @@ INSTALLED_APPS = [
 AUTH_USER_MODEL = 'users.User'
 
 # Configuration de l'authentification
+AUTHENTICATION_BACKENDS = ['core.throttle.ThrottledModelBackend']
 LOGIN_URL = '/users/login/'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/users/login/'
@@ -171,7 +189,9 @@ if _database_url:
             'PASSWORD': unquote(_db.password or ''),
             'HOST': _db.hostname or 'localhost',
             'PORT': str(_db.port or 5432),
-            'CONN_MAX_AGE': int(os.getenv('DB_CONN_MAX_AGE', '60')),
+            # Sous ASGI (uvicorn), Django recommande de ne pas garder les connexions ouvertes.
+            'CONN_MAX_AGE': int(os.getenv('DB_CONN_MAX_AGE', '0')),
+            'CONN_HEALTH_CHECKS': True,
         }
     }
 elif os.getenv('DB_ENGINE', 'sqlite').lower() == 'postgres':
@@ -183,7 +203,8 @@ elif os.getenv('DB_ENGINE', 'sqlite').lower() == 'postgres':
             'PASSWORD': os.getenv('DB_PASSWORD', ''),
             'HOST': os.getenv('DB_HOST', 'localhost'),
             'PORT': os.getenv('DB_PORT', '5432'),
-            'CONN_MAX_AGE': int(os.getenv('DB_CONN_MAX_AGE', '60')),
+            'CONN_MAX_AGE': int(os.getenv('DB_CONN_MAX_AGE', '0')),
+            'CONN_HEALTH_CHECKS': True,
         }
     }
 else:
@@ -265,6 +286,28 @@ SESSION_COOKIE_SECURE = _HTTPS
 CSRF_COOKIE_SECURE = _HTTPS
 if _HTTPS:
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    # Le navigateur n'utilisera plus jamais HTTP pour ce domaine (sous-domaines non inclus).
+    SECURE_HSTS_SECONDS = int(os.getenv('SECURE_HSTS_SECONDS', str(60 * 60 * 24 * 365)))
+SECURE_REFERRER_POLICY = 'same-origin'
+# W008 : la redirection HTTP → HTTPS est faite par Cloudflare et le proxy de Coolify.
+# W005/W021 : HSTS volontairement limité au domaine de la caisse — l'imposer aux autres
+# sous-domaines du client, ou l'inscrire dans la liste de préchargement (quasi
+# irréversible), pourrait casser ses autres sites.
+SILENCED_SYSTEM_CHECKS = ['security.W008', 'security.W005', 'security.W021']
+
+# Une session reste ouverte 7 jours sans activité (tablette de caisse partagée).
+SESSION_COOKIE_AGE = 60 * 60 * 24 * 7
+SESSION_SAVE_EVERY_REQUEST = False
+
+# Limitation des tentatives de connexion (cache partagé entre les processus via la base).
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+        'LOCATION': 'welto_cache',
+    }
+}
+if TESTING:
+    CACHES['default'] = {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'}
 
 # Journalisation : console + fichier rotatif dans userData (production) ou BASE_DIR (dev)
 _LOG_DIR = (Path(USER_DATA_PATH) / 'logs') if USER_DATA_PATH else (Path(BASE_DIR) / 'logs')
@@ -299,6 +342,8 @@ LOGGING = {
     },
     'loggers': {
         'django.request': {'level': 'WARNING'},
+        # Requêtes de robots avec un faux nom de domaine : refusées (400) sans remplir les journaux.
+        'django.security.DisallowedHost': {'handlers': [], 'propagate': False},
     },
 }
 

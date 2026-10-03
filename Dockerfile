@@ -20,6 +20,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     WELTO_USER_DATA=/data \
+    WELTO_ENV=production \
+    WELTO_HTTPS=true \
     WEB_CONCURRENCY=2
 
 WORKDIR /app
@@ -28,7 +30,7 @@ RUN pip install -r requirements.txt
 
 COPY blog_pos/ .
 COPY --from=css /src/core/static/css/app.css core/static/css/app.css
-RUN SECRET_KEY=collectstatic-only python manage.py collectstatic --noinput \
+RUN WELTO_ENV=build SECRET_KEY=collectstatic-only python manage.py collectstatic --noinput \
  && useradd --create-home --uid 1000 welto \
  && mkdir -p /data/media /data/logs \
  && chown -R welto:welto /data

@@ -9,6 +9,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from core.decorators import is_manager, manager_required
+from core.throttle import is_locked
 from .emailing import send_reset_code_email
 from .forms import (AppSettingForm, CustomUserChangeForm, CustomUserCreationForm, ForgotCodeForm,
                     ForgotRequestForm, ManagerResetPasswordForm, PasswordChangeForm, SetupForm)
@@ -45,6 +46,10 @@ def login_view(request):
     if request.method == 'POST':
         username = request.POST.get('username', '').strip()
         password = request.POST.get('password', '')
+        if is_locked(username, request):
+            messages.error(request, 'Trop de tentatives de connexion. Réessayez dans 15 minutes '
+                                    'ou demandez au gérant de réinitialiser votre mot de passe.')
+            return render(request, 'users/login.html', {'username': username}, status=429)
         user = authenticate(request, username=username, password=password) if username and password else None
         if user is not None:
             login(request, user)
