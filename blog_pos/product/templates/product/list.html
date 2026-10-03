@@ -3,8 +3,8 @@
 {% block title %}Produits{% endblock %}
 {% block content %}
 {% with is_mgr=request.user|manager %}
-<div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-  <h1 class="text-xl font-bold">Produits</h1>
+<div class="page-header">
+  <h1 class="page-title">Produits</h1>
   {% if is_mgr %}
   <div class="flex gap-2">
     <a href="{% url 'product:category_management' %}" class="btn btn-light">{% icon 'folder' 'h-4 w-4' %} Catégories</a>

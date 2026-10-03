@@ -2,30 +2,39 @@
 {% load welto %}
 {% block title %}Paramètres{% endblock %}
 {% block content %}
-<div class="mx-auto max-w-2xl">
-  <h1 class="mb-4 text-xl font-bold">Paramètres</h1>
-  <form method="post" enctype="multipart/form-data" class="space-y-4">{% csrf_token %}
+<div class="mx-auto max-w-4xl">
+  <div class="page-header">
+    <div><h1 class="page-title">Paramètres</h1><p class="page-subtitle">Identité de la boutique, devise, factures et tickets.</p></div>
+  </div>
+  <form method="post" enctype="multipart/form-data" class="card p-5 sm:p-8">{% csrf_token %}
     {% include 'partials/form_errors.html' %}
-    <div class="card space-y-4 p-5">
-      <h2 class="font-semibold">Boutique</h2>
-      <div class="grid gap-4 sm:grid-cols-2">
+    <section class="form-section">
+      <div><h2 class="form-section-title">Boutique</h2><p class="form-section-desc">Affiché dans le menu, sur les tickets et les factures.</p></div>
+      <div class="grid gap-4 sm:grid-cols-2 lg:col-span-2">
         {% include 'partials/field.html' with field=form.company_name %}
         {% include 'partials/field.html' with field=form.company_tagline %}
+        {% include 'partials/field.html' with field=form.company_logo class='sm:col-span-2' %}
+      </div>
+    </section>
+    <section class="form-section">
+      <div><h2 class="form-section-title">Vente et stock</h2><p class="form-section-desc">La devise s'affiche après chaque montant. Sous le seuil, un produit est signalé « stock bas ».</p></div>
+      <div class="grid gap-4 sm:grid-cols-2 lg:col-span-2">
         {% include 'partials/field.html' with field=form.currency_label %}
         {% include 'partials/field.html' with field=form.low_stock_threshold %}
       </div>
-    </div>
-    <div class="card space-y-4 p-5">
-      <h2 class="font-semibold">Factures et tickets</h2>
-      {% include 'partials/field.html' with field=form.company_logo %}
-      <div class="grid gap-4 sm:grid-cols-2">
+    </section>
+    <section class="form-section">
+      <div><h2 class="form-section-title">Factures PDF</h2><p class="form-section-desc">Couleur des titres, signature et cachet apposés sur les factures.</p></div>
+      <div class="grid gap-4 sm:grid-cols-2 lg:col-span-2">
         {% include 'partials/field.html' with field=form.brand_color_primary %}
         {% include 'partials/field.html' with field=form.signatory_name %}
         {% include 'partials/field.html' with field=form.signature_image %}
         {% include 'partials/field.html' with field=form.stamp_image %}
       </div>
+    </section>
+    <div class="form-actions">
+      <button class="btn btn-primary">{% icon 'check' 'h-4 w-4' %} Enregistrer</button>
     </div>
-    <div class="flex justify-end"><button class="btn btn-primary">{% icon 'check' 'h-4 w-4' %} Enregistrer</button></div>
   </form>
 </div>
 {% endblock %}

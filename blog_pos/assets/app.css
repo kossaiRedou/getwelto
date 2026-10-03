@@ -1,7 +1,7 @@
 /*
  * Source Tailwind de WELTO. Compilée vers core/static/css/app.css :
  *   tailwindcss -i assets/app.css -o core/static/css/app.css --minify
- * (fait automatiquement par le Dockerfile ; voir README pour le développement).
+ * (fait automatiquement par le Dockerfile ; voir DEPLOY.md pour le développement).
  */
 @import "tailwindcss" source(none);
 
@@ -17,70 +17,165 @@
 
 @theme {
   --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --color-navy-950: #0a1322;
-  --color-navy-900: #0f1b2d;
-  --color-navy-800: #172a45;
-  --color-navy-700: #22395c;
-  --color-navy-600: #34507a;
+
+  /* Couleur de la marque WELTO : #3D35E6 (brand-600) */
+  --color-brand-50: #f1f0fe;
+  --color-brand-100: #e3e1fc;
+  --color-brand-200: #c9c6f9;
+  --color-brand-300: #a5a1f5;
+  --color-brand-400: #7c76f0;
+  --color-brand-500: #5850ec;
+  --color-brand-600: #3d35e6;
+  --color-brand-700: #3029c4;
+  --color-brand-800: #28239d;
+  --color-brand-900: #231f7c;
+  --color-brand-950: #15124a;
+
+  /* Fond sombre de la caisse, légèrement teinté de la couleur de marque */
+  --color-navy-950: #0b0c22;
+  --color-navy-900: #121433;
+  --color-navy-800: #1b1e4a;
+  --color-navy-700: #282c66;
+  --color-navy-600: #3a3f86;
 }
 
 @layer base {
   html { -webkit-tap-highlight-color: transparent; }
-  body { @apply bg-slate-100 text-slate-900 antialiased; }
-  [x-cloak], [hidden] { display: none !important; }
+  body { @apply bg-slate-50 text-slate-900 antialiased; }
+  [hidden] { display: none !important; }
   input[type=number]::-webkit-inner-spin-button,
   input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
   input[type=number] { -moz-appearance: textfield; }
+  ::selection { @apply bg-brand-200 text-brand-950; }
 }
 
 @layer components {
+  /* --- Formulaires --- */
   .input {
-    @apply block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-base text-slate-900
-      placeholder:text-slate-400 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30
-      disabled:bg-slate-100 disabled:text-slate-500;
+    @apply block h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 text-[15px] text-slate-900 shadow-xs
+      transition placeholder:text-slate-400 hover:border-slate-400
+      focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/15
+      disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500
+      aria-[invalid=true]:border-rose-400 aria-[invalid=true]:ring-4 aria-[invalid=true]:ring-rose-500/10;
   }
-  .checkbox { @apply h-5 w-5 rounded border-slate-300 accent-amber-500; }
+  textarea.input { @apply h-auto min-h-24 py-2.5; }
+  select.input {
+    @apply cursor-pointer appearance-none bg-no-repeat pr-10;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-position: right 0.75rem center;
+    background-size: 1.1rem;
+  }
+  input[type=color].input { @apply w-20 cursor-pointer p-1; }
+  .input-wrap { @apply relative; }
+  .input-wrap .input { @apply pr-16; }
+  .input-suffix {
+    @apply pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5 text-sm font-medium text-slate-400;
+  }
+
+  /* Case à cocher affichée comme un interrupteur */
+  .checkbox {
+    @apply relative h-6 w-11 shrink-0 cursor-pointer appearance-none rounded-full bg-slate-300 transition
+      checked:bg-brand-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-500/25;
+  }
+  .checkbox::before {
+    content: "";
+    @apply absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform;
+  }
+  .checkbox:checked::before { transform: translateX(1.25rem); }
+
   .file-input {
-    @apply block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-200
-      file:px-3 file:py-2 file:font-semibold file:text-slate-800;
+    @apply block w-full cursor-pointer rounded-xl border border-dashed border-slate-300 bg-slate-50 p-2 text-sm text-slate-600
+      file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:py-2
+      file:font-semibold file:text-brand-700 hover:border-brand-300;
   }
-  .label { @apply mb-1 block text-sm font-medium text-slate-700; }
+  .has-error .input { @apply border-rose-400 ring-4 ring-rose-500/10; }
+  .label { @apply mb-1.5 block text-sm font-semibold text-slate-700; }
+  .help { @apply mt-1.5 text-xs text-slate-500; }
+  .field-error { @apply mt-1.5 flex items-center gap-1 text-xs font-semibold text-rose-600; }
+
+  /* Sections de formulaire : titre et explication à gauche, champs à droite */
+  .form-section { @apply grid gap-4 border-b border-slate-200 py-6 first:pt-0 last:border-0 lg:grid-cols-3 lg:gap-8; }
+  .form-section-title { @apply text-base font-semibold text-slate-900; }
+  .form-section-desc { @apply mt-1 text-sm text-slate-500; }
+  .form-actions { @apply mt-2 flex flex-wrap items-center justify-end gap-2 pt-5; }
+
+  /* --- Boutons --- */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold
-      transition-colors select-none disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold whitespace-nowrap
+      transition select-none focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-500/25
+      disabled:cursor-not-allowed disabled:opacity-50;
   }
-  .btn-primary { @apply bg-amber-500 text-navy-950 hover:bg-amber-400; }
+  .btn-primary { @apply bg-brand-600 text-white shadow-sm shadow-brand-600/25 hover:bg-brand-700 active:bg-brand-800; }
   .btn-dark { @apply bg-navy-900 text-white hover:bg-navy-800; }
-  .btn-light { @apply border border-slate-300 bg-white text-slate-700 hover:bg-slate-50; }
-  .btn-danger { @apply bg-rose-600 text-white hover:bg-rose-500; }
-  .btn-ghost { @apply text-slate-600 hover:bg-slate-200; }
-  .btn-sm { @apply px-3 py-1.5 text-xs; }
-  .card { @apply rounded-xl border border-slate-200 bg-white shadow-sm; }
-  .badge { @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold; }
-  .badge-green { @apply bg-emerald-100 text-emerald-800; }
-  .badge-red { @apply bg-rose-100 text-rose-800; }
-  .badge-amber { @apply bg-amber-100 text-amber-800; }
-  .badge-gray { @apply bg-slate-100 text-slate-700; }
-  .table { @apply w-full text-left text-sm; }
-  .table th { @apply bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500; }
-  .table td { @apply border-t border-slate-100 px-3 py-2.5 align-middle; }
-  .table tbody tr:hover { @apply bg-slate-50; }
-  .nav-link {
-    @apply flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-300
-      hover:bg-navy-800 hover:text-white;
+  .btn-light { @apply border border-slate-300 bg-white text-slate-700 shadow-xs hover:border-slate-400 hover:bg-slate-50; }
+  .btn-danger { @apply bg-rose-600 text-white hover:bg-rose-700; }
+  .btn-ghost { @apply text-slate-600 hover:bg-slate-200/70 hover:text-slate-900; }
+  .btn-sm { @apply h-8 rounded-lg px-3 text-xs; }
+  .btn-lg { @apply h-12 px-6 text-base; }
+
+  /* --- Mise en page --- */
+  .card { @apply rounded-2xl border border-slate-200/80 bg-white shadow-sm; }
+  .page-header { @apply mb-6 flex flex-wrap items-center justify-between gap-3; }
+  .page-title { @apply text-2xl font-bold tracking-tight text-slate-900; }
+  .page-subtitle { @apply mt-0.5 text-sm text-slate-500; }
+  .back-link {
+    @apply grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600
+      shadow-xs hover:border-slate-300 hover:text-slate-900;
   }
-  .nav-link.active { @apply bg-amber-500 text-navy-950; }
-  .kpi { @apply rounded-xl border border-slate-200 bg-white p-4 shadow-sm; }
+  .badge { @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold; }
+  .badge-green { @apply bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/15; }
+  .badge-red { @apply bg-rose-50 text-rose-700 ring-1 ring-rose-600/15; }
+  .badge-amber { @apply bg-amber-50 text-amber-800 ring-1 ring-amber-600/20; }
+  .badge-brand { @apply bg-brand-50 text-brand-700 ring-1 ring-brand-600/15; }
+  .badge-gray { @apply bg-slate-100 text-slate-700 ring-1 ring-slate-500/10; }
+  .table { @apply w-full text-left text-sm; }
+  .table th { @apply bg-slate-50/80 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-500; }
+  .table td { @apply border-t border-slate-100 px-4 py-3 align-middle; }
+  .table tbody tr:hover { @apply bg-brand-50/40; }
+  .nav-link {
+    @apply flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-300
+      transition hover:bg-white/5 hover:text-white;
+  }
+  .nav-link.active { @apply bg-brand-600 text-white shadow-sm shadow-brand-950/40; }
+  .nav-link svg { @apply shrink-0; }
+
+  .form-card { @apply rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6; }
+  .kpi { @apply rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm; }
   .kpi-label { @apply text-xs font-semibold uppercase tracking-wide text-slate-500; }
   .kpi-value { @apply mt-1 text-2xl font-bold tabular-nums text-slate-900; }
   .num { @apply tabular-nums whitespace-nowrap; }
+  .logo-mark { @apply grid place-items-center rounded-xl bg-brand-600 font-black text-white shadow-sm shadow-brand-950/30; }
 
-  /* Caisse */
+  /* --- Caisse et réception (fond sombre) --- */
   .method {
     @apply flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-navy-600 px-1 py-2.5
-      text-xs font-semibold leading-tight text-slate-300 hover:bg-navy-800;
+      text-xs font-semibold leading-tight text-slate-300 transition hover:bg-navy-800;
   }
-  .method.selected { @apply border-amber-500 bg-amber-500/10 text-amber-300; }
+  .method.selected { @apply border-brand-400 bg-brand-500/15 text-white; }
   .qbtn { @apply rounded-lg bg-navy-800 px-3 py-1.5 text-sm font-semibold text-slate-200 tabular-nums hover:bg-navy-700; }
-  .step { @apply grid h-10 w-10 place-items-center rounded-lg bg-navy-700 text-white hover:bg-navy-600 active:bg-amber-500 active:text-navy-950; }
+  .step {
+    @apply grid h-10 w-10 place-items-center rounded-lg bg-navy-700 text-white hover:bg-navy-600
+      active:bg-brand-500;
+  }
+  .dark-input {
+    @apply rounded-lg border border-navy-600 bg-navy-950 text-white placeholder:text-slate-500
+      focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/30;
+  }
+}
+
+/* Mise en page adaptative (hors couches : prioritaire sur les utilitaires).
+   Tablette en paysage (1024–1279 px) : menu réduit aux icônes pour laisser la place au contenu. */
+@media (min-width: 64rem) {
+  .sidebar { width: 4.5rem; }
+  .sidebar .nav-label, .sidebar .nav-section { display: none; }
+  .sidebar .nav-link, .sidebar .brand { justify-content: center; padding-left: 0; padding-right: 0; }
+  .content-shift { padding-left: 4.5rem; }
+}
+@media (min-width: 80rem) {
+  .sidebar { width: 15rem; }
+  .sidebar .nav-label { display: inline; }
+  .sidebar .nav-section { display: block; }
+  .sidebar .nav-link { justify-content: flex-start; padding-left: 0.75rem; padding-right: 0.75rem; }
+  .sidebar .brand { justify-content: flex-start; padding-left: 1rem; padding-right: 1rem; }
+  .content-shift { padding-left: 15rem; }
 }

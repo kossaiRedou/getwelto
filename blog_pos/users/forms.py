@@ -153,7 +153,3 @@ class AppSettingForm(StyledFormMixin, forms.ModelForm):
             'signature_image': forms.ClearableFileInput(attrs={'accept': 'image/*'}),
             'stamp_image': forms.ClearableFileInput(attrs={'accept': 'image/*'}),
         }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['brand_color_primary'].widget.attrs['class'] = 'h-11 w-20 cursor-pointer rounded-lg border border-slate-300 bg-white p-1'

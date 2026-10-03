@@ -183,7 +183,7 @@ class AppSetting(models.Model):
     )
     brand_color_primary = models.CharField(
         max_length=7,
-        default='#2c5aa0',
+        default='#3d35e6',
         verbose_name=_('Couleur principale'),
         help_text=_('Couleur principale de l\'entreprise (titres, barres)')
     )

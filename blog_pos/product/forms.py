@@ -28,9 +28,13 @@ class ProductForm(StyledFormMixin, forms.ModelForm):
             'active': 'Produit en vente',
         }
         help_texts = {
-            'barcode': 'Optionnel : scannez le code avec la douchette.',
-            'discount_value': 'Optionnel : laissez 0 si pas de promotion.',
-            'prix_achat': 'Sert au calcul de la marge.',
+            'barcode': 'Facultatif : scannez le code avec la douchette.',
+            'discount_value': 'Facultatif : laissez vide s’il n’y a pas de promotion.',
+            'prix_achat': 'Facultatif, mais nécessaire pour connaître votre marge.',
+        }
+        error_messages = {
+            'title': {'unique': 'Un produit porte déjà ce nom.'},
+            'barcode': {'unique': 'Ce code-barres est déjà attribué à un autre produit.'},
         }
         widgets = {
             'title': forms.TextInput(attrs={'placeholder': 'Ex : Riz 5 kg', 'autofocus': True}),
@@ -45,8 +49,18 @@ class ProductForm(StyledFormMixin, forms.ModelForm):
         self.fields['category'].empty_label = '— Aucune —'
         self.fields['category'].required = False
         self.fields['barcode'].required = False
+        for name in ('discount_value', 'prix_achat'):
+            self.fields[name].required = False
+            if not self.is_bound and not self.initial.get(name):
+                self.initial[name] = None   # champ vide plutôt que « 0 »
         if self.instance.pk:
             del self.fields['initial_qty']
+
+    def clean_discount_value(self):
+        return self.cleaned_data.get('discount_value') or Decimal('0')
+
+    def clean_prix_achat(self):
+        return self.cleaned_data.get('prix_achat') or Decimal('0')
 
     def clean_barcode(self):
         return (self.cleaned_data.get('barcode') or '').strip() or None
@@ -79,7 +93,7 @@ class StockForm(StyledFormMixin, forms.Form):
         ('remove', 'Retrait (perte, casse)'),
         ('set', 'Inventaire (stock compté)'),
     ]
-    action = forms.ChoiceField(label='Opération', choices=ACTIONS)
+    action = forms.ChoiceField(label='Opération', choices=ACTIONS, initial='restock', widget=forms.RadioSelect)
     quantity = forms.IntegerField(label='Quantité', min_value=0,
                                   widget=forms.NumberInput(attrs={'inputmode': 'numeric', 'min': '0'}))
     unit_cost = forms.DecimalField(label="Prix d'achat unitaire", required=False, min_value=Decimal('0'),

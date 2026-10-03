@@ -34,7 +34,7 @@
     <div class="flex h-44 items-end gap-0.5 sm:gap-1">
       {% for d in series %}
       <div class="group relative flex h-full flex-1 flex-col justify-end" title="{{ d.date|date:'d/m' }} : {{ d.total|money }}">
-        <div class="w-full rounded-t-sm bg-navy-700 group-hover:bg-amber-500" style="height: {{ d.pct }}%; min-height: 1px"></div>
+        <div class="w-full rounded-t-sm bg-brand-300 group-hover:bg-brand-600" style="height: {{ d.pct }}%; min-height: 1px"></div>
       </div>
       {% endfor %}
     </div>

@@ -2,17 +2,25 @@
 {% load welto %}
 {% block title %}{{ title }}{% endblock %}
 {% block content %}
-<div class="mx-auto max-w-lg">
-  <div class="mb-4 flex items-center gap-3">
-    <a href="{% if client %}{% url 'client:client_detail' client.pk %}{% else %}{% url 'client:client_list' %}{% endif %}" class="btn btn-ghost px-2" aria-label="Retour">{% icon 'back' %}</a>
-    <h1 class="text-xl font-bold">{{ title }}</h1>
+<div class="mx-auto max-w-2xl">
+  <div class="page-header">
+    <div class="flex items-center gap-3">
+      <a href="{% if client %}{% url 'client:client_detail' client.pk %}{% else %}{% url 'client:client_list' %}{% endif %}" class="back-link" aria-label="Retour">{% icon 'back' 'h-5 w-5' %}</a>
+      <div>
+        <h1 class="page-title">{{ title }}</h1>
+        <p class="page-subtitle">Le téléphone sert à retrouver le client à la caisse.</p>
+      </div>
+    </div>
   </div>
-  <form method="post" class="card space-y-4 p-5">{% csrf_token %}
+  <form method="post" class="card space-y-5 p-5 sm:p-8">{% csrf_token %}
     {% include 'partials/form_errors.html' %}
     {% include 'partials/field.html' with field=form.name %}
     {% include 'partials/field.html' with field=form.phone %}
     {% include 'partials/field.html' with field=form.is_active %}
-    <div class="flex justify-end border-t border-slate-100 pt-4"><button class="btn btn-primary">{% icon 'check' 'h-4 w-4' %} Enregistrer</button></div>
+    <div class="form-actions">
+      <a href="{% if client %}{% url 'client:client_detail' client.pk %}{% else %}{% url 'client:client_list' %}{% endif %}" class="btn btn-light">Annuler</a>
+      <button class="btn btn-primary">{% icon 'check' 'h-4 w-4' %} Enregistrer</button>
+    </div>
   </form>
 </div>
 {% endblock %}

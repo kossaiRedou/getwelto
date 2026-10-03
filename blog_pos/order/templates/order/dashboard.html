@@ -37,7 +37,7 @@
       {% for d in week %}
       <div class="flex h-full flex-1 flex-col items-center justify-end gap-1" title="{{ d.date|date:'d/m' }} : {{ d.total|money }}">
         <span class="text-[10px] font-semibold tabular-nums text-slate-600">{% if d.total %}{{ d.total|money }}{% endif %}</span>
-        <div class="w-full rounded-t-md {% if forloop.last %}bg-amber-500{% else %}bg-navy-700{% endif %}" style="height: {{ d.pct }}%; min-height: 2px"></div>
+        <div class="w-full rounded-t-md {% if forloop.last %}bg-brand-600{% else %}bg-brand-200{% endif %}" style="height: {{ d.pct }}%; min-height: 2px"></div>
         <span class="text-xs text-slate-500">{{ d.date|date:"D" }}</span>
       </div>
       {% endfor %}

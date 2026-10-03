@@ -2,8 +2,8 @@
 {% load welto %}
 {% block title %}Dépenses{% endblock %}
 {% block content %}
-<div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-  <h1 class="text-xl font-bold">Dépenses</h1>
+<div class="page-header">
+  <h1 class="page-title">Dépenses</h1>
   <a href="{% url 'aprovision:nouvelle_depense' %}" class="btn btn-primary">{% icon 'plus' 'h-4 w-4' %} Nouvelle dépense</a>
 </div>
 

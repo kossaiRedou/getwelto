@@ -1,0 +1,17 @@
+<div class="flex items-center gap-4">
+  {% if widget.is_initial %}
+  <img src="{{ widget.value.url }}" alt="" class="h-16 w-16 shrink-0 rounded-xl border border-slate-200 bg-white object-contain p-1">
+  {% else %}
+  <div class="grid h-16 w-16 shrink-0 place-items-center rounded-xl border border-dashed border-slate-300 bg-slate-50 text-slate-400">
+    <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>
+  </div>
+  {% endif %}
+  <div class="min-w-0 flex-1">
+    <input type="{{ widget.type }}" name="{{ widget.name }}"{% include "django/forms/widgets/attrs.html" %}>
+    {% if widget.is_initial and not widget.required %}
+    <label class="mt-1.5 inline-flex cursor-pointer items-center gap-2 text-xs text-slate-500">
+      <input type="checkbox" name="{{ widget.checkbox_name }}" id="{{ widget.checkbox_id }}" class="h-3.5 w-3.5 accent-rose-600"> Supprimer l'image actuelle
+    </label>
+    {% endif %}
+  </div>
+</div>

@@ -1,17 +1,20 @@
 {% extends 'base_auth.html' %}
 {% block title %}Connexion{% endblock %}
 {% block content %}
-<h1 class="mb-4 text-lg font-bold">Connexion</h1>
-<form method="post" class="space-y-4">{% csrf_token %}
+<h1 class="text-2xl font-bold tracking-tight">Bon retour 👋</h1>
+<p class="mb-6 mt-1 text-sm text-slate-500">Connectez-vous pour ouvrir la caisse.</p>
+<form method="post" class="space-y-5">{% csrf_token %}
   <div>
     <label for="id_username" class="label">Identifiant</label>
     <input id="id_username" name="username" value="{{ username }}" class="input" autocomplete="username" autocapitalize="none" required autofocus>
   </div>
   <div>
-    <label for="id_password" class="label">Mot de passe</label>
+    <div class="flex items-center justify-between">
+      <label for="id_password" class="label">Mot de passe</label>
+      <a href="{% url 'users:forgot_password' %}" class="mb-1.5 text-xs font-semibold text-brand-600 hover:text-brand-700">Mot de passe oublié ?</a>
+    </div>
     <input id="id_password" name="password" type="password" class="input" autocomplete="current-password" required>
   </div>
-  <button class="btn btn-primary w-full py-3 text-base">Se connecter</button>
+  <button class="btn btn-primary btn-lg w-full">Se connecter</button>
 </form>
-<p class="mt-4 text-center text-sm"><a href="{% url 'users:forgot_password' %}" class="text-slate-500 hover:underline">Mot de passe oublié ?</a></p>
 {% endblock %}

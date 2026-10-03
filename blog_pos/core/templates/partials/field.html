@@ -1,10 +1,20 @@
-<div class="{{ class|default:'' }}">
-  {% if field.field.widget.input_type == 'checkbox' %}
-  <label class="flex items-center gap-3 py-1 text-sm font-medium text-slate-700">{{ field }} {{ field.label }}</label>
+{% load welto %}{% with f=field.field %}
+<div class="{{ class|default:'' }}{% if field.errors %} has-error{% endif %}">
+  {% if f.widget.input_type == 'checkbox' %}
+  <label for="{{ field.id_for_label }}" class="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white px-4 py-3 transition hover:border-slate-300">
+    <span class="min-w-0">
+      <span class="block text-sm font-semibold text-slate-800">{{ field.label }}</span>
+      {% if field.help_text %}<span class="mt-0.5 block text-xs text-slate-500">{{ field.help_text }}</span>{% endif %}
+    </span>
+    {{ field }}
+  </label>
   {% else %}
-  <label for="{{ field.id_for_label }}" class="label">{{ field.label }}{% if field.field.required %} <span class="text-rose-500">*</span>{% endif %}</label>
-  {{ field }}
+  <label for="{{ field.id_for_label }}" class="label">{{ field.label }}{% if f.required %}<span class="text-rose-500"> *</span>{% endif %}</label>
+  {% if f.suffix %}
+  <div class="input-wrap">{{ field }}<span class="input-suffix">{{ f.suffix }}</span></div>
+  {% else %}{{ field }}{% endif %}
+  {% if field.help_text %}<p class="help">{{ field.help_text }}</p>{% endif %}
   {% endif %}
-  {% if field.help_text %}<p class="mt-1 text-xs text-slate-500">{{ field.help_text }}</p>{% endif %}
-  {% for error in field.errors %}<p class="mt-1 text-xs font-medium text-rose-600">{{ error }}</p>{% endfor %}
+  {% for error in field.errors %}<p class="field-error">{% icon 'alert' 'h-3.5 w-3.5 shrink-0' %} {{ error }}</p>{% endfor %}
 </div>
+{% endwith %}

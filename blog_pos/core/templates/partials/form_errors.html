@@ -1,5 +1,10 @@
-{% if form.non_field_errors %}
-<div class="mb-4 rounded-lg bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800 ring-1 ring-rose-200">
-  {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+{% load welto %}
+{% if form.errors %}
+<div role="alert" class="mb-6 flex gap-3 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-800 ring-1 ring-rose-200">
+  {% icon 'alert' 'mt-0.5 h-4 w-4 shrink-0' %}
+  <div>
+    <p class="font-semibold">Veuillez corriger {% if form.errors|length > 1 %}les champs signalés{% else %}le champ signalé{% endif %}.</p>
+    {% for error in form.non_field_errors %}<p class="mt-1">{{ error }}</p>{% endfor %}
+  </div>
 </div>
 {% endif %}

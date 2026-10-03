@@ -2,34 +2,82 @@
 {% load welto %}
 {% block title %}{{ title }}{% endblock %}
 {% block content %}
-<div class="mx-auto max-w-2xl">
-  <div class="mb-4 flex items-center gap-3">
-    <a href="{% url 'product:product_list' %}" class="btn btn-ghost px-2" aria-label="Retour">{% icon 'back' %}</a>
-    <h1 class="text-xl font-bold">{{ title }}</h1>
-  </div>
-  <form method="post" class="card space-y-4 p-5">{% csrf_token %}
-    {% include 'partials/form_errors.html' %}
-    {% include 'partials/field.html' with field=form.title %}
-    <div class="grid gap-4 sm:grid-cols-2">
-      {% include 'partials/field.html' with field=form.value %}
-      {% include 'partials/field.html' with field=form.discount_value %}
-      {% include 'partials/field.html' with field=form.prix_achat %}
-      {% if form.initial_qty %}{% include 'partials/field.html' with field=form.initial_qty %}{% endif %}
-      {% include 'partials/field.html' with field=form.category %}
-      {% include 'partials/field.html' with field=form.barcode %}
+<div class="mx-auto max-w-4xl">
+  <div class="page-header">
+    <div class="flex items-center gap-3">
+      <a href="{% url 'product:product_list' %}" class="back-link" aria-label="Retour">{% icon 'back' 'h-5 w-5' %}</a>
+      <div>
+        <h1 class="page-title">{{ title }}</h1>
+        {% if product %}<p class="page-subtitle">Stock actuel : <b class="text-slate-700">{{ product.qty }}</b></p>{% endif %}
+      </div>
     </div>
-    {% include 'partials/field.html' with field=form.active %}
-    <div class="flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-4">
+  </div>
+
+  <form method="post" class="card p-5 sm:p-8">{% csrf_token %}
+    {% include 'partials/form_errors.html' %}
+
+    <section class="form-section">
+      <div><h2 class="form-section-title">Informations</h2><p class="form-section-desc">Le nom apparaît à la caisse, sur les tickets et les factures.</p></div>
+      <div class="grid gap-4 sm:grid-cols-2 lg:col-span-2">
+        {% include 'partials/field.html' with field=form.title class='sm:col-span-2' %}
+        {% include 'partials/field.html' with field=form.category %}
+        {% include 'partials/field.html' with field=form.barcode %}
+      </div>
+    </section>
+
+    <section class="form-section">
+      <div><h2 class="form-section-title">Prix</h2><p class="form-section-desc">Le prix d'achat sert à calculer votre marge ; il n'est jamais visible par les clients.</p></div>
+      <div class="grid gap-4 sm:grid-cols-2 lg:col-span-2">
+        {% include 'partials/field.html' with field=form.value %}
+        {% include 'partials/field.html' with field=form.prix_achat %}
+        {% include 'partials/field.html' with field=form.discount_value %}
+        <div class="flex items-end">
+          <p id="margin" class="w-full rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-500 ring-1 ring-slate-200">Marge par unité : <b class="text-slate-900">—</b></p>
+        </div>
+      </div>
+    </section>
+
+    {% if form.initial_qty %}
+    <section class="form-section">
+      <div><h2 class="form-section-title">Stock</h2><p class="form-section-desc">Quantité déjà présente en boutique. Les arrivages suivants se saisissent dans « Approvisionnement ».</p></div>
+      <div class="grid gap-4 sm:grid-cols-2 lg:col-span-2">
+        {% include 'partials/field.html' with field=form.initial_qty %}
+      </div>
+    </section>
+    {% endif %}
+
+    <section class="form-section">
+      <div><h2 class="form-section-title">Disponibilité</h2><p class="form-section-desc">Un produit retiré de la vente n'apparaît plus à la caisse, mais son historique est conservé.</p></div>
+      <div class="lg:col-span-2">{% include 'partials/field.html' with field=form.active %}</div>
+    </section>
+
+    <div class="form-actions">
       {% if product %}
-      <a href="{% url 'product:delete_product' product.pk %}" class="btn btn-ghost mr-auto text-rose-600">{% icon 'trash' 'h-4 w-4' %} Supprimer</a>
+      <a href="{% url 'product:delete_product' product.pk %}" class="btn btn-ghost mr-auto text-rose-600 hover:bg-rose-50 hover:text-rose-700">{% icon 'trash' 'h-4 w-4' %} Supprimer</a>
+      <a href="{% url 'product:quick_stock' product.pk %}" class="btn btn-light">{% icon 'truck' 'h-4 w-4' %} Gérer le stock</a>
       {% else %}
       <button name="again" value="1" class="btn btn-light">Enregistrer et ajouter un autre</button>
       {% endif %}
       <button class="btn btn-primary">{% icon 'check' 'h-4 w-4' %} Enregistrer</button>
     </div>
   </form>
-  {% if product %}
-  <p class="mt-3 text-sm text-slate-500">Stock actuel : <b>{{ product.qty }}</b>. Pour le modifier, utilisez <a href="{% url 'product:quick_stock' product.pk %}" class="font-semibold text-navy-700 underline">la gestion du stock</a> (chaque mouvement est tracé).</p>
-  {% endif %}
 </div>
+<script>
+  (function () {
+    var value = document.getElementById('{{ form.value.id_for_label }}');
+    var promo = document.getElementById('{{ form.discount_value.id_for_label }}');
+    var cost = document.getElementById('{{ form.prix_achat.id_for_label }}');
+    var out = document.querySelector('#margin b');
+    function num(el) { var v = parseFloat(String(el.value).replace(',', '.')); return isNaN(v) ? 0 : v; }
+    function update() {
+      var price = num(promo) > 0 ? num(promo) : num(value);
+      if (!price || !num(cost)) { out.textContent = '—'; out.className = 'text-slate-900'; return; }
+      var m = Math.round((price - num(cost)) * 100) / 100;
+      out.textContent = m.toLocaleString('fr-FR') + ' {{ currency }} (' + Math.round(m / price * 100) + ' %)';
+      out.className = m > 0 ? 'text-emerald-700' : 'text-rose-600';
+    }
+    [value, promo, cost].forEach(function (el) { el.addEventListener('input', update); });
+    update();
+  })();
+</script>
 {% endblock %}

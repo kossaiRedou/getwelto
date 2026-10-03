@@ -120,7 +120,7 @@
           (p.active ? '' : ' <span class="rounded bg-slate-600 px-1.5 text-[10px] font-semibold uppercase text-slate-200">retiré</span>') + '</span>' +
           '<span class="block text-xs ' + (p.stock > 0 ? 'text-slate-400' : 'text-rose-400') + '">Stock : ' + p.stock +
           (p.cost ? ' · achat ' + fmt(p.cost) : ' · prix d\'achat ?') + '</span></span>' +
-          '<span class="shrink-0 font-bold tabular-nums text-emerald-400">' + fmt(p.price) + '</span></button>';
+          '<span class="shrink-0 font-bold tabular-nums text-brand-300">' + fmt(p.price) + '</span></button>';
       }).join('') + '</div>';
     } else if (q.text) {
       html += '<p class="p-4 text-center text-slate-500">Aucun produit ne correspond.</p>';
@@ -128,7 +128,7 @@
       html += '<p class="p-6 text-center text-slate-500">Aucun produit pour l\'instant : scannez ou tapez un nom pour créer le premier.</p>';
     }
     if (q.text && !exactTitle(q.text) && !catalog.byBarcode[q.text]) {
-      html += '<button type="button" data-create class="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-emerald-500/60 px-3 py-3.5 font-semibold text-emerald-300 hover:bg-emerald-500/10">' +
+      html += '<button type="button" data-create class="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-brand-400/60 px-3 py-3.5 font-semibold text-brand-200 hover:bg-brand-500/10">' +
         '+ Créer ' + (looksLikeBarcode(q.text) ? 'un produit avec le code ' : '« ') + esc(q.text) + (looksLikeBarcode(q.text) ? '' : ' »') + '</button>';
     }
     el.results.innerHTML = html;
@@ -188,14 +188,14 @@
   var MINUS = '<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"/></svg>';
   var PLUS = '<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M12 5v14"/></svg>';
   var TRASH = '<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>';
-  var FIELD = 'w-full rounded-lg border bg-navy-950 px-3 py-2 text-right font-semibold text-white focus:border-emerald-400 focus:outline-none';
+  var FIELD = 'w-full rounded-lg border bg-navy-950 px-3 py-2 text-right font-semibold text-white focus:border-brand-400 focus:outline-none';
 
   function lineInfo(l) {
     var p = l.id ? catalog.byId[l.id] : null;
     var c = lineCalc(l);
     var bits = [];
     if (p) bits.push('Stock ' + p.stock + ' → <b class="text-white">' + (p.stock + l.qty) + '</b>');
-    else bits.push('<b class="text-emerald-300">Nouveau produit</b>');
+    else bits.push('<b class="text-brand-300">Nouveau produit</b>');
     if (c.costOk && c.priceOk) {
       var margin = c.price - c.cost;
       bits.push('marge <b class="' + (margin > 0 ? 'text-emerald-300' : 'text-rose-400') + '">' + fmt(margin) + '</b>/u');
@@ -219,7 +219,7 @@
         '</div><button type="button" data-del class="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-slate-400 hover:bg-rose-600 hover:text-white" aria-label="Retirer">' + TRASH + '</button></div>' +
         '<div class="mt-2 flex items-center gap-2"><span class="w-20 text-xs text-slate-400">Qté reçue</span>' +
         '<button type="button" class="step" data-dec aria-label="Moins">' + MINUS + '</button>' +
-        '<input data-f="qty" value="' + l.qty + '" inputmode="numeric" aria-label="Quantité reçue" class="h-10 w-20 rounded-lg border border-navy-600 bg-navy-950 text-center text-lg font-bold text-white focus:border-emerald-400 focus:outline-none">' +
+        '<input data-f="qty" value="' + l.qty + '" inputmode="numeric" aria-label="Quantité reçue" class="h-10 w-20 rounded-lg border border-navy-600 bg-navy-950 text-center text-lg font-bold text-white focus:border-brand-400 focus:outline-none">' +
         '<button type="button" class="step" data-inc aria-label="Plus">' + PLUS + '</button></div>' +
         '<div class="mt-2 grid grid-cols-2 gap-2">' +
         '<label class="text-xs text-slate-400">Prix d\'achat<input data-f="cost" value="' + esc(l.cost) + '" inputmode="decimal" placeholder="0" class="mt-1 ' + FIELD + (c.costOk ? ' border-navy-600' : ' border-rose-500') + '"></label>' +
@@ -265,9 +265,9 @@
   function flash(uid) {
     var node = el.lines.querySelector('[data-uid="' + uid + '"]');
     if (!node) return;
-    node.classList.add('ring-2', 'ring-emerald-400');
+    node.classList.add('ring-2', 'ring-brand-400');
     node.scrollIntoView({ block: 'nearest' });
-    setTimeout(function () { node.classList.remove('ring-2', 'ring-emerald-400'); }, 500);
+    setTimeout(function () { node.classList.remove('ring-2', 'ring-brand-400'); }, 500);
   }
 
   // ---------------------------------------------------------- validation

@@ -2,9 +2,9 @@
 {% load welto %}
 {% block title %}Vente {{ order.title }}{% endblock %}
 {% block content %}
-<div class="mb-4 flex flex-wrap items-center gap-3">
-  <a href="{% url 'order_list' %}" class="btn btn-ghost px-2" aria-label="Retour">{% icon 'back' %}</a>
-  <h1 class="text-xl font-bold">Vente {{ order.title }}</h1>
+<div class="page-header justify-start">
+  <a href="{% url 'order_list' %}" class="back-link" aria-label="Retour">{% icon 'back' 'h-5 w-5' %}</a>
+  <h1 class="page-title">Vente {{ order.title }}</h1>
   {% if order.is_paid %}<span class="badge badge-green">Payée</span>{% elif order.amount_paid %}<span class="badge badge-amber">Partiellement payée</span>{% else %}<span class="badge badge-red">À crédit</span>{% endif %}
   <div class="ml-auto flex flex-wrap gap-2">
     <a href="{% url 'order_ticket' order.pk %}?print=1" target="_blank" rel="noopener" class="btn btn-light">{% icon 'printer' 'h-4 w-4' %} Ticket</a>

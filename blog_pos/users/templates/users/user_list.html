@@ -2,8 +2,8 @@
 {% load welto %}
 {% block title %}Utilisateurs{% endblock %}
 {% block content %}
-<div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-  <h1 class="text-xl font-bold">Utilisateurs</h1>
+<div class="page-header">
+  <h1 class="page-title">Utilisateurs</h1>
   <a href="{% url 'users:user_create' %}" class="btn btn-primary">{% icon 'plus' 'h-4 w-4' %} Nouvel utilisateur</a>
 </div>
 <form method="get" class="card mb-4 flex gap-2 p-3">

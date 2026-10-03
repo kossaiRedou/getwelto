@@ -129,7 +129,7 @@
     var chip = function (id, label) {
       var on = category === id;
       return '<button type="button" data-cat="' + id + '" class="shrink-0 rounded-full px-3 py-1.5 text-sm font-medium ' +
-        (on ? 'bg-amber-500 text-navy-950' : 'bg-navy-800 text-slate-300 hover:bg-navy-700') + '">' + esc(label) + '</button>';
+        (on ? 'bg-brand-600 text-white' : 'bg-navy-800 text-slate-300 hover:bg-navy-700') + '">' + esc(label) + '</button>';
     };
     el.cats.innerHTML = chip(0, 'Tout') + catalog.categories.map(function (c) { return chip(c[0], c[1]); }).join('');
   }
@@ -151,7 +151,7 @@
       return '<button type="button" data-add="' + p.id + '" class="flex w-full items-center gap-3 rounded-xl bg-navy-900 px-3 py-3 text-left ring-1 ring-navy-800 hover:bg-navy-800 active:bg-navy-700' + (out ? ' opacity-50' : '') + '">' +
         '<span class="min-w-0 flex-1"><span class="block truncate font-semibold text-white">' + esc(p.title) + '</span>' +
         '<span class="block text-xs ' + (out ? 'text-rose-400' : 'text-slate-400') + '">' + (out ? 'Rupture de stock' : 'Stock : ' + p.stock) + '</span></span>' +
-        '<span class="shrink-0 font-bold tabular-nums text-amber-400">' + fmt(p.price) + '</span></button>';
+        '<span class="shrink-0 font-bold tabular-nums text-brand-300">' + fmt(p.price) + '</span></button>';
     }).join('') + '</div>';
   }
 
@@ -210,9 +210,9 @@
   function flash(id) {
     var node = el.cart.querySelector('[data-line="' + id + '"]');
     if (!node) return;
-    node.classList.add('ring-2', 'ring-amber-400');
+    node.classList.add('ring-2', 'ring-brand-400');
     node.scrollIntoView({ block: 'nearest' });
-    setTimeout(function () { node.classList.remove('ring-2', 'ring-amber-400'); }, 500);
+    setTimeout(function () { node.classList.remove('ring-2', 'ring-brand-400'); }, 500);
   }
 
   // Prix unitaire de la ligne : prix négocié pour cette vente, sinon prix catalogue.
@@ -252,25 +252,25 @@
       if (editingPrice === p.id) {
         priceHtml = '<span class="mt-1 flex items-center gap-2">' +
           '<input data-price-input="' + p.id + '" value="' + K.toInput(unit) + '" inputmode="decimal" aria-label="Prix pour cette vente" ' +
-          'class="h-9 w-32 rounded-lg border-2 border-amber-400 bg-navy-950 px-2 text-right font-bold text-white focus:outline-none">' +
+          'class="h-9 w-32 rounded-lg border-2 border-brand-400 bg-navy-950 px-2 text-right font-bold text-white focus:outline-none">' +
           '<span class="text-xs text-slate-400">pour cette vente</span></span>';
       } else {
         priceHtml = '<span class="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm">' +
           (l.price != null ? '<span class="text-slate-500 line-through">' + fmt(p.price) + '</span>' : '') +
           '<button type="button" data-price="' + p.id + '" class="-ml-1.5 rounded-md px-1.5 py-1 font-semibold underline decoration-dotted underline-offset-2 hover:bg-navy-700 ' +
-          (l.price != null ? 'text-amber-300' : 'text-slate-300') + '" title="Modifier le prix pour cette vente">' + fmt(unit) + ' ✎</button>' +
+          (l.price != null ? 'text-brand-300' : 'text-slate-300') + '" title="Modifier le prix pour cette vente">' + fmt(unit) + ' ✎</button>' +
           '<span class="text-slate-400">× ' + l.qty + '</span>' +
           (l.price != null ? '<button type="button" data-reset-price="' + p.id + '" class="rounded-md px-1.5 py-0.5 text-slate-400 hover:bg-navy-700 hover:text-white">↺ prix normal</button>' : '') +
           '</span>';
       }
-      return '<li data-line="' + p.id + '" class="rounded-xl bg-navy-800 p-3 transition' + (l.price != null ? ' ring-1 ring-amber-500/40' : '') + '">' +
+      return '<li data-line="' + p.id + '" class="rounded-xl bg-navy-800 p-3 transition' + (l.price != null ? ' ring-1 ring-brand-400/50' : '') + '">' +
         '<div class="flex items-start gap-3"><div class="min-w-0 flex-1">' +
         '<p class="truncate font-semibold text-white">' + esc(p.title) + '</p>' + priceHtml + '</div>' +
         '<p class="shrink-0 text-lg font-bold tabular-nums text-white">' + fmt(unit * l.qty) + '</p></div>' +
         '<div class="mt-2 flex items-center gap-2">' +
         '<button type="button" class="step" data-dec="' + p.id + '" aria-label="Moins">' + ICON.minus + '</button>' +
         '<input data-qty="' + p.id + '" value="' + l.qty + '" inputmode="numeric" pattern="[0-9]*" aria-label="Quantité" ' +
-        'class="h-10 w-20 rounded-lg border border-navy-600 bg-navy-950 text-center text-lg font-bold text-white focus:border-amber-400 focus:outline-none">' +
+        'class="h-10 w-20 rounded-lg border border-navy-600 bg-navy-950 text-center text-lg font-bold text-white focus:border-brand-400 focus:outline-none">' +
         '<button type="button" class="step" data-inc="' + p.id + '" aria-label="Plus">' + ICON.plus + '</button>' +
         '<span class="text-xs text-slate-500">/ ' + p.stock + '</span>' +
         '<button type="button" data-del="' + p.id + '" class="ml-auto grid h-10 w-10 place-items-center rounded-lg text-slate-400 hover:bg-rose-600 hover:text-white" aria-label="Retirer">' + ICON.trash + '</button>' +
@@ -297,11 +297,11 @@
     el.subtotal.hidden = !t.discount;
     el.subtotal.textContent = fmt(t.subtotal);
     el.discountLabel.textContent = t.discount ? '− ' + fmt(t.discount) : 'Remise';
-    el.discountBtn.classList.toggle('text-amber-300', !!t.discount);
+    el.discountBtn.classList.toggle('text-brand-300', !!t.discount);
 
     var c = state.client;
     el.clientLabel.textContent = c ? c.name + (c.debt ? ' · doit ' + fmt(c.debt) : '') : 'Ajouter un client (facultatif)';
-    el.clientBtn.classList.toggle('border-amber-500', !!c);
+    el.clientBtn.classList.toggle('border-brand-400', !!c);
 
     Array.prototype.forEach.call(el.methods.querySelectorAll('[data-method]'), function (b) {
       b.classList.toggle('selected', b.dataset.method === state.method);
