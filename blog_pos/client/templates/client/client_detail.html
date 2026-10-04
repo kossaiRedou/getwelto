@@ -1,69 +1,134 @@
 {% extends 'base.html' %}
 {% load welto %}
 {% block title %}{{ client.name }}{% endblock %}
+{% block body_class %}bg-[#f3f6fb]{% endblock %}
+{% block head %}{% include 'partials/dash_styles.html' %}{% endblock %}
 {% block content %}
-<div class="page-header justify-start">
-  <a href="{% url 'client:client_list' %}" class="back-link" aria-label="Retour">{% icon 'back' 'h-5 w-5' %}</a>
-  <div class="min-w-0">
-    <h1 class="page-title truncate">{{ client.name }}{% if not client.is_active %} <span class="badge badge-gray">désactivé</span>{% endif %}</h1>
-    <a href="tel:{{ client.phone }}" class="text-sm text-slate-500 hover:underline">{{ client.phone }}</a>
-  </div>
-  <div class="ml-auto flex gap-2">
-    <a href="{% url 'client:edit_client' client.pk %}" class="btn btn-light">{% icon 'edit' 'h-4 w-4' %} Modifier</a>
-    {% if request.user|manager and not n_orders %}<a href="{% url 'client:delete_client' client.pk %}" class="btn btn-ghost text-rose-600" aria-label="Supprimer">{% icon 'trash' 'h-4 w-4' %}</a>{% endif %}
+{# ---------- Profil ---------- #}
+<div class="d-card d-hero mb-6 p-5 sm:p-6">
+  <div class="flex flex-wrap items-center gap-4">
+    <a href="{% url 'client:client_list' %}" class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/15 text-white transition hover:bg-white/25" aria-label="Retour">{% icon 'back' 'h-5 w-5' %}</a>
+    <span class="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-white text-2xl font-bold text-[#0e6dfa] shadow-[0_8px_20px_-8px_rgba(0,0,0,.35)]">{{ client.name|slice:":1"|upper }}</span>
+    <div class="min-w-0 flex-1">
+      <h1 class="flex flex-wrap items-center gap-2 text-2xl font-bold tracking-tight">
+        <span class="truncate">{{ client.name }}</span>
+        {% if not client.is_active %}<span class="rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">Désactivé</span>{% endif %}
+      </h1>
+      <p class="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-white/80">
+        <a href="tel:{{ client.phone }}" class="inline-flex items-center gap-1.5 font-medium text-white hover:underline">{% icon 'phone' 'h-4 w-4' %} {{ client.phone }}</a>
+        <span>Client depuis le {{ client.created_at|date:"j F Y" }}</span>
+      </p>
+    </div>
+    <div class="flex gap-2">
+      <a href="{% url 'client:edit_client' client.pk %}" class="inline-flex h-10 items-center gap-2 rounded-xl bg-white px-4 text-sm font-semibold text-[#0e6dfa] transition hover:bg-white/90">{% icon 'edit' 'h-4 w-4' %} Modifier</a>
+      {% if request.user|manager and not n_orders %}
+      <a href="{% url 'client:delete_client' client.pk %}" class="grid h-10 w-10 place-items-center rounded-xl bg-white/15 text-white transition hover:bg-rose-500" aria-label="Supprimer">{% icon 'trash' 'h-4 w-4' %}</a>
+      {% endif %}
+    </div>
   </div>
 </div>
 
-<div class="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-  <div class="kpi"><p class="kpi-label">Dette actuelle</p><p class="kpi-value {% if debt %}text-rose-700{% endif %}">{{ debt|money }}</p></div>
-  <div class="kpi"><p class="kpi-label">Achats</p><p class="kpi-value">{{ total_spent|money }}</p></div>
-  <div class="kpi"><p class="kpi-label">Ventes</p><p class="kpi-value">{{ n_orders }}</p></div>
-  <div class="kpi"><p class="kpi-label">Articles achetés</p><p class="kpi-value">{{ qty_bought }}</p></div>
+{# ---------- Indicateurs ---------- #}
+<div class="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+  <div class="d-card d-tint-blue p-5">
+    <div class="flex items-start justify-between">
+      <p class="d-label text-slate-500">Achats</p>
+      <span class="d-chip bg-[#0e6dfa]/10 text-[#0e6dfa]">{% icon 'cart' 'h-[18px] w-[18px]' %}</span>
+    </div>
+    <p class="d-value mt-3 text-slate-900">{{ total_spent|money }} <span class="text-base font-semibold text-slate-400">{{ currency }}</span></p>
+    <p class="mt-4 text-xs text-slate-500">{% if start or end %}Sur la période choisie{% else %}Depuis le premier achat{% endif %}</p>
+  </div>
+
+  <div class="d-card d-tint-green p-5">
+    <div class="flex items-start justify-between">
+      <p class="d-label text-slate-500">Payé</p>
+      <span class="d-chip bg-[#1b8650]/10 text-[#1b8650]">{% icon 'cash' 'h-[18px] w-[18px]' %}</span>
+    </div>
+    <p class="d-value mt-3 text-[#1b8650]">{{ total_paid|money }}</p>
+    <div class="mt-4">
+      <div class="h-1.5 overflow-hidden rounded-full bg-[#1b8650]/10">
+        <div class="h-full rounded-full bg-[#1b8650]" style="width: {% if total_spent %}{% widthratio total_paid total_spent 100 %}{% else %}0{% endif %}%"></div>
+      </div>
+      <p class="mt-1.5 text-xs text-slate-500">{% if total_spent %}{% widthratio total_paid total_spent 100 %} % des achats{% else %}Aucun achat{% endif %}</p>
+    </div>
+  </div>
+
+  <div class="d-card d-tint-yellow p-5">
+    <div class="flex items-start justify-between">
+      <p class="d-label text-slate-500">Dette actuelle</p>
+      <span class="d-chip bg-[#fbc105]/25 text-[#7a5a00]">{% icon 'clock' 'h-[18px] w-[18px]' %}</span>
+    </div>
+    <p class="d-value mt-3 {% if debt %}text-rose-600{% else %}text-slate-900{% endif %}">{{ debt|money }}</p>
+    <p class="mt-4 text-xs {% if debt %}text-slate-500{% else %}font-semibold text-[#1b8650]{% endif %}">{% if debt %}{{ unpaid_orders|length }} vente{{ unpaid_orders|length|pluralize }} à régler{% else %}✓ Aucune dette{% endif %}</p>
+  </div>
+
+  <div class="d-card d-tint-blue p-5">
+    <div class="flex items-start justify-between">
+      <p class="d-label text-slate-500">Ventes</p>
+      <span class="d-chip bg-[#0e6dfa]/10 text-[#0e6dfa]">{% icon 'receipt' 'h-[18px] w-[18px]' %}</span>
+    </div>
+    <p class="d-value mt-3 text-slate-900">{{ n_orders }}</p>
+    <p class="mt-4 text-xs text-slate-500">{{ qty_bought }} article{{ qty_bought|pluralize }} acheté{{ qty_bought|pluralize }}</p>
+  </div>
 </div>
 
+{# ---------- Ventes à régler ---------- #}
 {% if unpaid_orders %}
-<div class="card mb-4 overflow-hidden ring-1 ring-rose-200">
-  <h2 class="px-4 pt-4 font-semibold text-rose-800">Ventes à régler</h2>
-  <div class="overflow-x-auto">
-    <table class="table mt-2">
-      <thead><tr><th>N°</th><th>Date</th><th class="text-right">Total</th><th class="text-right">Reste</th><th></th></tr></thead>
-      <tbody>
-      {% for o in unpaid_orders %}
-        <tr>
-          <td class="font-semibold">{{ o.title }}</td>
-          <td class="num text-slate-500">{{ o.date|date:"d/m/Y" }}</td>
-          <td class="num text-right">{{ o.final_value|money }}</td>
-          <td class="num text-right font-semibold text-rose-700">{{ o.remaining_amount|money }}</td>
-          <td class="text-right"><a href="{{ o.get_absolute_url }}" class="btn btn-primary btn-sm">Encaisser</a></td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table>
+<section class="d-card d-wash-yellow mb-6 p-5">
+  <div class="mb-3 flex items-center justify-between">
+    <h2 class="d-title">Ventes à régler</h2>
+    <span class="rounded-full bg-[#fbc105]/25 px-2.5 py-0.5 text-xs font-semibold text-[#7a5a00]">{{ unpaid_orders|length }}</span>
   </div>
-</div>
+  <ul class="space-y-2">
+    {% for o in unpaid_orders %}
+    <li class="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl bg-white/85 px-4 py-3 ring-1 ring-[#fbc105]/30">
+      <span class="min-w-0 flex-1">
+        <span class="block text-sm font-semibold text-slate-900 tabular-nums">{{ o.title }}</span>
+        <span class="block text-xs text-slate-400">{{ o.date|date:"j F Y" }} · total {{ o.final_value|money }}</span>
+      </span>
+      <span class="text-right">
+        <span class="block text-xs text-slate-500">Reste à payer</span>
+        <span class="block text-base font-bold tabular-nums text-rose-600">{{ o.remaining_amount|money }}</span>
+      </span>
+      <a href="{{ o.get_absolute_url }}" class="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[#0e6dfa] px-3.5 text-sm font-semibold text-white shadow-[0_6px_14px_-6px_rgba(14,109,250,.7)] transition hover:bg-[#0a52c6]">{% icon 'cash' 'h-4 w-4' %} Encaisser</a>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
 {% endif %}
 
-<div class="card overflow-hidden">
-  <form method="get" class="flex flex-wrap items-center gap-2 px-4 pt-4">
-    <h2 class="mr-auto font-semibold">Historique</h2>
-    <input type="date" name="start" value="{{ start|date:'Y-m-d' }}" class="input w-auto py-1.5 text-sm" aria-label="Du">
-    <input type="date" name="end" value="{{ end|date:'Y-m-d' }}" class="input w-auto py-1.5 text-sm" aria-label="Au">
-    <button class="btn btn-light btn-sm">Filtrer</button>
+{# ---------- Historique ---------- #}
+<section class="d-card d-wash-blue p-5">
+  <form method="get" class="mb-3 flex flex-wrap items-center gap-2">
+    <h2 class="d-title mr-auto">Historique des achats</h2>
+    <input type="date" name="start" value="{{ start|date:'Y-m-d' }}" class="input h-9 w-auto py-1 text-sm" aria-label="Du">
+    <span class="text-sm text-slate-400">→</span>
+    <input type="date" name="end" value="{{ end|date:'Y-m-d' }}" class="input h-9 w-auto py-1 text-sm" aria-label="Au">
+    <button class="inline-flex h-9 items-center rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-800">Filtrer</button>
+    {% if start or end %}<a href="{% url 'client:client_detail' client.pk %}" class="text-sm font-semibold text-slate-500 hover:text-[#0e6dfa]">Tout</a>{% endif %}
   </form>
-  <div class="overflow-x-auto">
-    <table class="table mt-2">
-      <thead><tr><th>N°</th><th>Date</th><th class="text-right">Total</th><th>Statut</th></tr></thead>
-      <tbody>
-      {% for o in orders %}
-        <tr class="cursor-pointer" onclick="location.href='{{ o.get_absolute_url }}'">
-          <td><a href="{{ o.get_absolute_url }}" class="font-semibold hover:underline">{{ o.title }}</a></td>
-          <td class="num text-slate-500">{{ o.timestamp|date:"d/m/Y H:i" }}</td>
-          <td class="num text-right">{{ o.final_value|money }}</td>
-          <td>{% if o.is_paid %}<span class="badge badge-green">Payée</span>{% else %}<span class="badge badge-red">Reste {{ o.remaining_amount|money }}</span>{% endif %}</td>
-        </tr>
-      {% empty %}<tr><td colspan="4" class="py-8 text-center text-slate-500">Aucune vente.</td></tr>{% endfor %}
-      </tbody>
-    </table>
-  </div>
-</div>
+  <ul class="divide-y divide-[#0e6dfa]/10">
+    {% for o in orders %}
+    <li>
+      <a href="{{ o.get_absolute_url }}" class="d-row -mx-2 flex items-center gap-3 rounded-xl px-2 py-2.5 transition">
+        <span class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white text-[#0e6dfa] ring-1 ring-[#0e6dfa]/15">{% icon 'receipt' 'h-4 w-4' %}</span>
+        <span class="min-w-0 flex-1">
+          <span class="block text-sm font-semibold text-slate-900 tabular-nums">{{ o.title }}</span>
+          <span class="block text-xs text-slate-400 tabular-nums">{{ o.timestamp|date:"d/m/Y · H:i" }}</span>
+        </span>
+        <span class="num text-sm font-bold text-slate-900">{{ o.final_value|money }}</span>
+        {% if o.is_paid %}
+        <span class="flex w-24 justify-center rounded-lg bg-[#1b8650]/10 py-1 text-xs font-semibold text-[#1b8650]">Payée</span>
+        {% elif o.amount_paid %}
+        <span class="flex w-24 justify-center rounded-lg bg-[#fbc105]/20 py-1 text-xs font-semibold text-[#7a5a00]">Partiel</span>
+        {% else %}
+        <span class="flex w-24 justify-center rounded-lg bg-rose-50 py-1 text-xs font-semibold text-rose-600">Crédit</span>
+        {% endif %}
+      </a>
+    </li>
+    {% empty %}
+    <li class="py-10 text-center text-sm text-slate-500">Aucune vente{% if start or end %} sur cette période{% endif %}.</li>
+    {% endfor %}
+  </ul>
+</section>
 {% endblock %}
