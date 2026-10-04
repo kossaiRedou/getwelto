@@ -17,6 +17,14 @@
     background: radial-gradient(120% 90% at 0% 0%, rgba(14, 109, 250, .07), transparent 55%), #fff; }
   .d-tint-yellow { border-color: rgba(251, 193, 5, .5);
     background: radial-gradient(120% 90% at 0% 0%, rgba(251, 193, 5, .14), transparent 55%), #fff; }
+  /* Grandes cartes : fond légèrement teinté sur toute la hauteur */
+  .d-wash-blue { border-color: rgba(14, 109, 250, .2);
+    background: linear-gradient(180deg, rgba(14, 109, 250, .085) 0%, rgba(14, 109, 250, .03) 100%), #fff; }
+  .d-wash-green { border-color: rgba(27, 134, 80, .22);
+    background: linear-gradient(180deg, rgba(27, 134, 80, .09) 0%, rgba(27, 134, 80, .03) 100%), #fff; }
+  .d-wash-yellow { border-color: rgba(251, 193, 5, .5);
+    background: linear-gradient(180deg, rgba(251, 193, 5, .16) 0%, rgba(251, 193, 5, .05) 100%), #fff; }
+  .d-wash-blue .d-row:hover, .d-wash-green .d-row:hover, .d-wash-yellow .d-row:hover { background: rgba(255, 255, 255, .75); }
   .d-hero {
     color: #fff;
     border: 0;
@@ -104,7 +112,7 @@
 
 <div class="grid gap-4 lg:grid-cols-3">
   {# ---------- Graphique ---------- #}
-  <section class="d-card flex flex-col p-5 lg:col-span-2">
+  <section class="d-card d-wash-blue flex flex-col p-5 lg:col-span-2">
     <div class="mb-6 flex items-center justify-between">
       <h2 class="d-title">7 derniers jours</h2>
       <span class="inline-flex items-center gap-1.5 text-xs text-slate-500"><span class="h-2.5 w-2.5 rounded-sm bg-[#0e6dfa]"></span>Aujourd'hui · {{ currency }}</span>
@@ -128,7 +136,7 @@
   </section>
 
   {# ---------- Top produits ---------- #}
-  <section class="d-card p-5">
+  <section class="d-card d-wash-green p-5">
     <div class="mb-5 flex items-center justify-between">
       <h2 class="d-title">Top produits du mois</h2>
       <span class="d-chip h-8 w-8 bg-[#1b8650]/10 text-[#1b8650]">{% icon 'box' 'h-4 w-4' %}</span>
@@ -138,11 +146,11 @@
       {% for p in top_products %}
       <li>
         <div class="flex items-center gap-3 text-sm">
-          <span class="grid h-6 w-6 shrink-0 place-items-center rounded-lg text-xs font-bold {% if forloop.first %}bg-[#1b8650] text-white{% else %}bg-slate-100 text-slate-500{% endif %}">{{ forloop.counter }}</span>
+          <span class="grid h-6 w-6 shrink-0 place-items-center rounded-lg text-xs font-bold {% if forloop.first %}bg-[#1b8650] text-white{% else %}bg-white text-slate-500 ring-1 ring-[#1b8650]/15{% endif %}">{{ forloop.counter }}</span>
           <span class="min-w-0 flex-1 truncate font-medium text-slate-800">{{ p.product__title }}<span class="ml-1.5 text-xs font-normal tabular-nums text-slate-400">×{{ p.qty }}</span></span>
           <span class="num font-semibold text-slate-900">{{ p.total|money }}</span>
         </div>
-        <div class="mt-2 ml-9 h-1.5 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-[#1b8650]" style="width: {% widthratio p.qty top 100 %}%"></div></div>
+        <div class="mt-2 ml-9 h-1.5 overflow-hidden rounded-full bg-white"><div class="h-full rounded-full bg-[#1b8650]" style="width: {% widthratio p.qty top 100 %}%"></div></div>
       </li>
       {% empty %}
       <li class="py-8 text-center text-sm text-slate-400">Aucune vente ce mois-ci.</li>
@@ -152,7 +160,7 @@
   </section>
 
   {# ---------- Stock bas ---------- #}
-  <section class="d-card p-5">
+  <section class="d-card d-wash-yellow p-5">
     <div class="mb-4 flex items-center justify-between">
       <h2 class="d-title">Stock bas <span class="rounded-full bg-[#fbc105]/20 px-2 py-0.5 text-xs font-semibold text-[#7a5a00]">&lt; {{ threshold }}</span></h2>
       <a href="{% url 'product:product_list' %}?status=low" class="d-link">Voir tout</a>
@@ -160,10 +168,10 @@
     <ul class="space-y-1">
       {% for p in low_stock %}
       <li>
-        <a href="{% url 'product:quick_stock' p.pk %}" class="-mx-2 flex items-center gap-3 rounded-xl px-2 py-2 transition hover:bg-slate-50">
+        <a href="{% url 'product:quick_stock' p.pk %}" class="d-row -mx-2 flex items-center gap-3 rounded-xl px-2 py-2 transition">
           <span class="min-w-0 flex-1">
             <span class="block truncate text-sm font-medium text-slate-800">{{ p.title }}</span>
-            <span class="mt-1.5 block h-1 overflow-hidden rounded-full bg-slate-100"><span class="block h-full rounded-full {% if p.qty == 0 %}bg-rose-500{% else %}bg-[#fbc105]{% endif %}" style="width: {% widthratio p.qty threshold 100 %}%"></span></span>
+            <span class="mt-1.5 block h-1 overflow-hidden rounded-full bg-white"><span class="block h-full rounded-full {% if p.qty == 0 %}bg-rose-500{% else %}bg-[#fbc105]{% endif %}" style="width: {% widthratio p.qty threshold 100 %}%"></span></span>
           </span>
           {% if p.qty == 0 %}
           <span class="rounded-lg bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-600">Rupture</span>
@@ -182,16 +190,16 @@
   </section>
 
   {# ---------- Dernières ventes ---------- #}
-  <section class="d-card p-5 lg:col-span-2">
+  <section class="d-card d-wash-blue p-5 lg:col-span-2">
     <div class="mb-3 flex items-center justify-between">
       <h2 class="d-title">Dernières ventes</h2>
       <a href="{% url 'order_list' %}" class="d-link">Voir tout</a>
     </div>
-    <ul class="divide-y divide-slate-100">
+    <ul class="divide-y divide-[#0e6dfa]/10">
       {% for o in recent_orders %}
       <li>
-        <a href="{{ o.get_absolute_url }}" class="-mx-2 flex items-center gap-3 rounded-xl px-2 py-2.5 transition hover:bg-slate-50">
-          <span class="grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-bold {% if o.client %}bg-[#0e6dfa]/10 text-[#0e6dfa]{% else %}bg-slate-100 text-slate-400{% endif %}">
+        <a href="{{ o.get_absolute_url }}" class="d-row -mx-2 flex items-center gap-3 rounded-xl px-2 py-2.5 transition">
+          <span class="grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-bold {% if o.client %}bg-[#0e6dfa]/10 text-[#0e6dfa]{% else %}bg-white text-slate-400 ring-1 ring-slate-200{% endif %}">
             {% if o.client %}{{ o.client.name|slice:":1"|upper }}{% else %}{% icon 'user' 'h-4 w-4' %}{% endif %}
           </span>
           <span class="min-w-0 flex-1">
