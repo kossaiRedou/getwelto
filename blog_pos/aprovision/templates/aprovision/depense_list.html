@@ -1,52 +1,102 @@
 {% extends 'base.html' %}
 {% load welto %}
 {% block title %}Dépenses{% endblock %}
+{% block body_class %}bg-[#f3f6fb]{% endblock %}
+{% block head %}{% include 'partials/dash_styles.html' %}{% endblock %}
 {% block content %}
-<div class="page-header">
-  <h1 class="page-title">Dépenses</h1>
-  <a href="{% url 'aprovision:nouvelle_depense' %}" class="btn btn-primary">{% icon 'plus' 'h-4 w-4' %} Nouvelle dépense</a>
+<div class="mb-6 flex flex-wrap items-end justify-between gap-3">
+  <div>
+    <p class="text-sm font-medium text-slate-500">Du {{ start|date:"j F Y" }} au {{ end|date:"j F Y" }}</p>
+    <h1 class="mt-0.5 text-2xl font-bold tracking-tight text-slate-900">Dépenses</h1>
+  </div>
+  <a href="{% url 'aprovision:nouvelle_depense' %}" class="inline-flex h-10 items-center gap-2 rounded-xl bg-[#0e6dfa] px-4 text-sm font-semibold text-white shadow-[0_8px_18px_-8px_rgba(14,109,250,.8)] transition hover:bg-[#0a52c6]">
+    {% icon 'plus' 'h-4 w-4' %} Nouvelle dépense
+  </a>
 </div>
 
-<form method="get" class="card mb-4 grid gap-3 p-3 sm:grid-cols-4">
-  <input type="date" name="start" value="{{ start|date:'Y-m-d' }}" class="input" aria-label="Du">
-  <input type="date" name="end" value="{{ end|date:'Y-m-d' }}" class="input" aria-label="Au">
-  <select name="type" class="input">
+{# ---------- Filtres ---------- #}
+<form method="get" class="d-card mb-6 flex flex-wrap items-center gap-2 p-3">
+  <input type="date" name="start" value="{{ start|date:'Y-m-d' }}" class="input h-9 w-auto py-1 text-sm" aria-label="Du">
+  <span class="text-sm text-slate-400">→</span>
+  <input type="date" name="end" value="{{ end|date:'Y-m-d' }}" class="input h-9 w-auto py-1 text-sm" aria-label="Au">
+  <select name="type" class="input h-9 w-auto min-w-44 py-1 text-sm" aria-label="Type">
     <option value="">Tous les types</option>
     {% for t in types %}<option value="{{ t.pk }}" {% if type_id == t.pk|stringformat:'s' %}selected{% endif %}>{{ t.nom }}</option>{% endfor %}
   </select>
-  <button class="btn btn-dark">{% icon 'search' 'h-4 w-4' %} Filtrer</button>
+  <button class="inline-flex h-9 items-center gap-1.5 rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-800">{% icon 'search' 'h-4 w-4' %} Filtrer</button>
+  {% if type_id %}<a href="?start={{ start|date:'Y-m-d' }}&end={{ end|date:'Y-m-d' }}" class="text-sm font-semibold text-slate-500 hover:text-[#0e6dfa]">Tous les types</a>{% endif %}
 </form>
 
-<div class="mb-4 grid gap-3 lg:grid-cols-3">
-  <div class="kpi"><p class="kpi-label">Total de la période</p><p class="kpi-value">{{ total|money }} <span class="text-sm text-slate-500">{{ currency }}</span></p></div>
-  <div class="card p-4 lg:col-span-2">
-    <ul class="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
-      {% for t in by_type %}<li class="flex justify-between"><span>{{ t.type_depense__nom }} <span class="text-slate-400">({{ t.n }})</span></span><span class="num font-semibold">{{ t.s|money }}</span></li>{% empty %}<li class="text-slate-500">Aucune dépense.</li>{% endfor %}
-    </ul>
+{# ---------- Synthèse ---------- #}
+<div class="mb-6 grid gap-4 lg:grid-cols-3">
+  <div class="d-card d-hero flex flex-col p-5">
+    <div class="flex items-start justify-between">
+      <p class="d-label text-white/80">Total de la période</p>
+      <span class="d-chip bg-white/15 text-white">{% icon 'wallet' 'h-[18px] w-[18px]' %}</span>
+    </div>
+    <p class="d-value mt-3">{{ total|money }} <span class="text-base font-semibold text-white/70">{{ currency }}</span></p>
+    <div class="mt-auto flex flex-wrap items-center gap-2 pt-4 text-xs text-white/80">
+      <span class="rounded-full bg-white/15 px-2 py-0.5 font-semibold text-white">{{ page_obj.paginator.count }} dépense{{ page_obj.paginator.count|pluralize }}</span>
+      <span>{{ by_type|length }} type{{ by_type|length|pluralize }}</span>
+    </div>
   </div>
+
+  <section class="d-card d-wash-yellow p-5 lg:col-span-2">
+    <div class="mb-4 flex items-center justify-between">
+      <h2 class="d-title">Répartition par type</h2>
+      <span class="d-chip h-8 w-8 bg-[#fbc105]/30 text-[#7a5a00]">{% icon 'layers' 'h-4 w-4' %}</span>
+    </div>
+    <ul class="grid gap-x-8 gap-y-3.5 text-sm sm:grid-cols-2">
+      {% for t in by_type %}
+      <li>
+        <div class="flex items-center gap-2">
+          <span class="min-w-0 flex-1 truncate font-medium text-slate-800">{{ t.type_depense__nom }}<span class="ml-1.5 text-xs font-normal text-slate-400">×{{ t.n }}</span></span>
+          <span class="num font-semibold text-slate-900">{{ t.s|money }}</span>
+        </div>
+        <div class="mt-1.5 flex items-center gap-2">
+          <div class="h-1.5 flex-1 overflow-hidden rounded-full bg-white"><div class="h-full rounded-full bg-[#fbc105]" style="width: {% widthratio t.s total 100 %}%"></div></div>
+          <span class="w-9 text-right text-xs tabular-nums text-slate-500">{% widthratio t.s total 100 %} %</span>
+        </div>
+      </li>
+      {% empty %}
+      <li class="py-6 text-center text-slate-500 sm:col-span-2">Aucune dépense sur la période.</li>
+      {% endfor %}
+    </ul>
+  </section>
 </div>
 
-<div class="card overflow-hidden">
+{# ---------- Liste ---------- #}
+<section class="d-card d-tint-yellow overflow-hidden">
+  <div class="flex items-center justify-between px-5 pt-5 pb-3">
+    <h2 class="d-title">Détail des dépenses</h2>
+    <span class="text-xs text-slate-500">{{ page_obj.paginator.count }} ligne{{ page_obj.paginator.count|pluralize }}</span>
+  </div>
   <div class="overflow-x-auto">
-    <table class="table">
-      <thead><tr><th>Date</th><th>Type</th><th>Description</th><th class="text-right">Montant</th><th></th></tr></thead>
-      <tbody>
+    <table class="w-full text-left text-sm">
+      <thead>
+        <tr class="border-y border-[#fbc105]/30 bg-[#fbc105]/10 text-xs font-semibold text-slate-500">
+          <th class="px-5 py-2.5">Date</th><th class="px-5 py-2.5">Type</th><th class="px-5 py-2.5">Description</th><th class="px-5 py-2.5 text-right">Montant</th><th class="px-5 py-2.5"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
       {% for d in page_obj %}
-        <tr>
-          <td class="num text-slate-500">{{ d.date_depense|date:"d/m/Y" }}</td>
-          <td><span class="badge badge-gray">{{ d.type_depense.nom }}</span></td>
-          <td>{{ d.description }}{% if d.fournisseur %}<span class="block text-xs text-slate-400">{{ d.fournisseur }}{% if d.reference %} · {{ d.reference }}{% endif %}</span>{% endif %}</td>
-          <td class="num text-right font-semibold">{{ d.montant|money }}</td>
-          <td class="text-right">
+        <tr class="transition hover:bg-[#fbc105]/5">
+          <td class="px-5 py-3 whitespace-nowrap tabular-nums text-slate-500">{{ d.date_depense|date:"d/m/Y" }}</td>
+          <td class="px-5 py-3"><span class="inline-flex rounded-lg bg-[#fbc105]/20 px-2 py-0.5 text-xs font-semibold whitespace-nowrap text-[#7a5a00]">{{ d.type_depense.nom }}</span></td>
+          <td class="px-5 py-3 text-slate-800">{{ d.description }}{% if d.fournisseur %}<span class="block text-xs text-slate-400">{{ d.fournisseur }}{% if d.reference %} · {{ d.reference }}{% endif %}</span>{% endif %}</td>
+          <td class="px-5 py-3 text-right font-bold whitespace-nowrap tabular-nums text-slate-900">{{ d.montant|money }}</td>
+          <td class="px-5 py-3 text-right">
             <form method="post" action="{% url 'aprovision:depense_delete' d.pk %}" data-confirm="Supprimer cette dépense de {{ d.montant|money }} ?">{% csrf_token %}
-              <button class="rounded p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600" aria-label="Supprimer">{% icon 'trash' 'h-4 w-4' %}</button>
+              <button class="grid h-8 w-8 place-items-center rounded-lg text-slate-400 transition hover:bg-rose-50 hover:text-rose-600" aria-label="Supprimer">{% icon 'trash' 'h-4 w-4' %}</button>
             </form>
           </td>
         </tr>
-      {% empty %}<tr><td colspan="5" class="py-10 text-center text-slate-500">Aucune dépense sur la période.</td></tr>{% endfor %}
+      {% empty %}
+        <tr><td colspan="5" class="px-5 py-12 text-center text-slate-500">Aucune dépense sur la période.</td></tr>
+      {% endfor %}
       </tbody>
     </table>
   </div>
   {% include 'partials/pagination.html' %}
-</div>
+</section>
 {% endblock %}
