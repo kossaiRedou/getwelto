@@ -1,3 +1,5 @@
+import re
+
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.core.exceptions import ValidationError
@@ -135,21 +137,41 @@ class AppSettingForm(StyledFormMixin, forms.ModelForm):
     class Meta:
         model = AppSetting
         fields = ['company_name', 'company_tagline', 'currency_label', 'low_stock_threshold',
-                  'company_logo', 'brand_color_primary', 'signatory_name', 'signature_image', 'stamp_image']
+                  'company_logo', 'brand_color_primary', 'brand_color_secondary', 'brand_color_accent',
+                  'signatory_name', 'signature_image', 'stamp_image']
         labels = {
             'company_name': 'Nom de la boutique',
             'company_tagline': 'Activité / slogan',
             'currency_label': 'Devise',
             'low_stock_threshold': "Seuil d'alerte stock",
             'company_logo': 'Logo',
-            'brand_color_primary': 'Couleur des factures',
+            'brand_color_primary': 'Couleur principale',
+            'brand_color_secondary': 'Couleur secondaire',
+            'brand_color_accent': "Couleur d'accent",
             'signatory_name': 'Nom du signataire',
             'signature_image': 'Signature',
             'stamp_image': 'Cachet',
         }
         widgets = {
             'brand_color_primary': forms.TextInput(attrs={'type': 'color'}),
+            'brand_color_secondary': forms.TextInput(attrs={'type': 'color'}),
+            'brand_color_accent': forms.TextInput(attrs={'type': 'color'}),
             'company_logo': forms.ClearableFileInput(attrs={'accept': 'image/*'}),
             'signature_image': forms.ClearableFileInput(attrs={'accept': 'image/*'}),
             'stamp_image': forms.ClearableFileInput(attrs={'accept': 'image/*'}),
         }
+        help_texts = {
+            'brand_color_primary': 'Titres, bandeaux et tableau de la facture.',
+            'brand_color_secondary': 'Montant payé et mention « payée ».',
+            'brand_color_accent': 'Reste à payer et mention « impayée ».',
+        }
+
+    def clean(self):
+        data = super().clean()
+        for name in ('brand_color_primary', 'brand_color_secondary', 'brand_color_accent'):
+            value = (data.get(name) or '').strip().lower()
+            if value and not re.fullmatch(r'#[0-9a-f]{6}', value):
+                self.add_error(name, 'Couleur invalide (format #RRGGBB).')
+            elif value:
+                data[name] = value
+        return data

@@ -27,6 +27,11 @@
       <div class="flex flex-wrap gap-2 text-xs">
         <span class="rounded-full bg-white/15 px-3 py-1 font-semibold">Devise : {{ s.currency_label|default:"—" }}</span>
         <span class="rounded-full bg-white/15 px-3 py-1 font-semibold">Stock bas &lt; {{ s.low_stock_threshold }}</span>
+        <span class="inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1" title="Couleurs des factures">
+          <span class="h-3.5 w-3.5 rounded-full ring-2 ring-white/60" style="background: {{ s.brand_color_primary }}"></span>
+          <span class="h-3.5 w-3.5 rounded-full ring-2 ring-white/60" style="background: {{ s.brand_color_secondary }}"></span>
+          <span class="h-3.5 w-3.5 rounded-full ring-2 ring-white/60" style="background: {{ s.brand_color_accent }}"></span>
+        </span>
       </div>
     </div>
   </div>
@@ -66,13 +71,22 @@
       <div>
         <span class="d-chip mb-3 bg-[#fbc105]/25 text-[#7a5a00]">{% icon 'receipt' 'h-[18px] w-[18px]' %}</span>
         <h2 class="d-title">Factures et documents</h2>
-        <p class="mt-1 text-sm text-slate-500">Couleur des titres, signature et cachet apposés sur les factures PDF.</p>
+        <p class="mt-1 text-sm text-slate-500">Les trois couleurs de votre entreprise, la signature et le cachet apposés sur les factures PDF.</p>
       </div>
-      <div class="grid gap-4 sm:grid-cols-2 lg:col-span-2">
-        {% include 'partials/field.html' with field=form.brand_color_primary %}
-        {% include 'partials/field.html' with field=form.signatory_name %}
-        {% include 'partials/field.html' with field=form.signature_image %}
-        {% include 'partials/field.html' with field=form.stamp_image %}
+      <div class="space-y-5 lg:col-span-2">
+        <div>
+          <p class="label">Couleurs de l'entreprise</p>
+          <div class="grid gap-3 rounded-2xl bg-white/80 p-4 ring-1 ring-[#fbc105]/30 sm:grid-cols-3">
+            {% include 'partials/field.html' with field=form.brand_color_primary %}
+            {% include 'partials/field.html' with field=form.brand_color_secondary %}
+            {% include 'partials/field.html' with field=form.brand_color_accent %}
+          </div>
+        </div>
+        <div class="grid gap-4 sm:grid-cols-2">
+          {% include 'partials/field.html' with field=form.signatory_name class='sm:col-span-2' %}
+          {% include 'partials/field.html' with field=form.signature_image %}
+          {% include 'partials/field.html' with field=form.stamp_image %}
+        </div>
       </div>
     </section>
 
