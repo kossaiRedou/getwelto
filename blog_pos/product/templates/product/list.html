@@ -1,60 +1,109 @@
 {% extends 'base.html' %}
 {% load welto %}
 {% block title %}Produits{% endblock %}
+{% block body_class %}bg-[#f3f6fb]{% endblock %}
+{% block head %}{% include 'partials/dash_styles.html' %}{% endblock %}
 {% block content %}
 {% with is_mgr=request.user|manager %}
-<div class="page-header">
-  <h1 class="page-title">Produits</h1>
+<div class="mb-6 flex flex-wrap items-end justify-between gap-3">
+  <div>
+    <p class="text-sm font-medium text-slate-500">{{ page_obj.paginator.count }} produit{{ page_obj.paginator.count|pluralize }}</p>
+    <h1 class="mt-0.5 text-2xl font-bold tracking-tight text-slate-900">Produits</h1>
+  </div>
   {% if is_mgr %}
-  <div class="flex gap-2">
-    <a href="{% url 'product:category_management' %}" class="btn btn-light">{% icon 'folder' 'h-4 w-4' %} Catégories</a>
-    <a href="{% url 'product:restock' %}" class="btn btn-dark">{% icon 'truck' 'h-4 w-4' %} Approvisionner</a>
-    <a href="{% url 'product:add_product' %}" class="btn btn-primary">{% icon 'plus' 'h-4 w-4' %} Ajouter</a>
+  <div class="flex flex-wrap gap-2">
+    <a href="{% url 'product:category_management' %}" class="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 text-sm font-semibold text-slate-700 transition hover:border-[#0e6dfa]/40 hover:text-[#0e6dfa]">{% icon 'folder' 'h-4 w-4' %} Catégories</a>
+    <a href="{% url 'product:restock' %}" class="inline-flex h-10 items-center gap-2 rounded-xl border border-[#1b8650]/30 bg-[#1b8650]/10 px-3.5 text-sm font-semibold text-[#1b8650] transition hover:bg-[#1b8650]/15">{% icon 'truck' 'h-4 w-4' %} Approvisionner</a>
+    <a href="{% url 'product:add_product' %}" class="inline-flex h-10 items-center gap-2 rounded-xl bg-[#0e6dfa] px-4 text-sm font-semibold text-white shadow-[0_8px_18px_-8px_rgba(14,109,250,.8)] transition hover:bg-[#0a52c6]">{% icon 'plus' 'h-4 w-4' %} Ajouter</a>
   </div>
   {% endif %}
 </div>
 
-<form method="get" class="card mb-4 grid gap-3 p-3 sm:grid-cols-[1fr_auto_auto_auto]">
-  <input name="q" value="{{ q }}" class="input" placeholder="Nom, code-barres ou catégorie">
-  <select name="category" class="input">
-    <option value="">Toutes catégories</option>
-    {% for c in categories %}<option value="{{ c.pk }}" {% if category == c.pk|stringformat:'s' %}selected{% endif %}>{{ c.title }}</option>{% endfor %}
-  </select>
-  <select name="status" class="input">
-    <option value="">En vente</option>
-    <option value="low" {% if status == 'low' %}selected{% endif %}>Stock bas ({{ low_count }})</option>
-    <option value="inactive" {% if status == 'inactive' %}selected{% endif %}>Retirés de la vente</option>
-    <option value="all" {% if status == 'all' %}selected{% endif %}>Tous</option>
-  </select>
-  <button class="btn btn-dark">{% icon 'search' 'h-4 w-4' %} Filtrer</button>
-</form>
+{# ---------- Filtres ---------- #}
+<div class="d-card mb-4 p-3">
+  <nav class="mb-3 flex flex-wrap gap-1.5" aria-label="Filtrer par statut">
+    {% with qe=q|urlencode %}{% with base='?q='|add:qe|add:'&category='|add:category %}
+    <a href="{{ base }}" class="inline-flex h-9 items-center rounded-xl px-3.5 text-sm font-semibold transition {% if not status %}bg-[#0e6dfa] text-white{% else %}text-slate-600 hover:bg-[#0e6dfa]/10 hover:text-[#0e6dfa]{% endif %}">En vente</a>
+    <a href="{{ base }}&status=low" class="inline-flex h-9 items-center gap-2 rounded-xl px-3.5 text-sm font-semibold transition {% if status == 'low' %}bg-[#0e6dfa] text-white{% else %}text-slate-600 hover:bg-[#0e6dfa]/10 hover:text-[#0e6dfa]{% endif %}">
+      Stock bas {% if low_count %}<span class="rounded-full bg-[#fbc105] px-1.5 text-xs font-bold text-slate-900">{{ low_count }}</span>{% endif %}
+    </a>
+    <a href="{{ base }}&status=inactive" class="inline-flex h-9 items-center rounded-xl px-3.5 text-sm font-semibold transition {% if status == 'inactive' %}bg-[#0e6dfa] text-white{% else %}text-slate-600 hover:bg-[#0e6dfa]/10 hover:text-[#0e6dfa]{% endif %}">Retirés de la vente</a>
+    <a href="{{ base }}&status=all" class="inline-flex h-9 items-center rounded-xl px-3.5 text-sm font-semibold transition {% if status == 'all' %}bg-[#0e6dfa] text-white{% else %}text-slate-600 hover:bg-[#0e6dfa]/10 hover:text-[#0e6dfa]{% endif %}">Tous</a>
+    {% endwith %}{% endwith %}
+  </nav>
+  <form method="get" class="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
+    <input type="hidden" name="status" value="{{ status }}">
+    <label class="relative">
+      <span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400">{% icon 'search' 'h-4 w-4' %}</span>
+      <input name="q" value="{{ q }}" class="input h-10 pl-9" placeholder="Nom, code-barres ou catégorie">
+    </label>
+    <select name="category" class="input h-10 sm:w-52" aria-label="Catégorie">
+      <option value="">Toutes catégories</option>
+      {% for c in categories %}<option value="{{ c.pk }}" {% if category == c.pk|stringformat:'s' %}selected{% endif %}>{{ c.title }}</option>{% endfor %}
+    </select>
+    <button class="inline-flex h-10 items-center justify-center rounded-xl bg-slate-900 px-5 text-sm font-semibold text-white transition hover:bg-slate-800">Rechercher</button>
+  </form>
+</div>
 
-<div class="card overflow-hidden">
+{# ---------- Liste ---------- #}
+<section class="d-card overflow-hidden">
   <div class="overflow-x-auto">
-    <table class="table">
-      <thead><tr><th>Produit</th><th>Catégorie</th><th class="text-right">Prix</th>{% if is_mgr %}<th class="text-right">Achat</th>{% endif %}<th class="text-right">Stock</th>{% if is_mgr %}<th></th>{% endif %}</tr></thead>
-      <tbody>
+    <table class="w-full text-left text-sm">
+      <thead>
+        <tr class="border-b border-[#0e6dfa]/15 bg-[#0e6dfa]/[0.06] text-xs font-semibold text-slate-500">
+          <th class="px-5 py-3">Produit</th>
+          <th class="px-5 py-3">Catégorie</th>
+          <th class="px-5 py-3 text-right">Prix</th>
+          {% if is_mgr %}<th class="px-5 py-3 text-right">Achat</th>{% endif %}
+          <th class="px-5 py-3 text-right">Stock</th>
+          {% if is_mgr %}<th class="px-5 py-3"></th>{% endif %}
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
       {% for p in page_obj %}
-        <tr class="{% if not p.active %}opacity-60{% endif %}">
-          <td><div class="flex items-center gap-3">{% product_badge p %}<div class="min-w-0"><span class="font-semibold" style="color:{{ p.text_color }}">{{ p.title }}</span>{% if not p.active %} <span class="badge badge-gray">retiré</span>{% endif %}{% if p.barcode %}<span class="block text-xs text-slate-400">{{ p.barcode }}</span>{% endif %}</div></div></td>
-          <td class="text-slate-600"><span class="inline-flex items-center gap-1.5">{% color_dot p.category.color %}{{ p.category.title }}</span></td>
-          <td class="num text-right font-semibold">{{ p.final_value|money }}{% if p.discount_value %}<span class="block text-xs font-normal text-slate-400 line-through">{{ p.value|money }}</span>{% endif %}</td>
-          {% if is_mgr %}<td class="num text-right text-slate-500">{{ p.prix_achat|money }}</td>{% endif %}
-          <td class="text-right"><span class="badge {% if p.qty == 0 %}badge-red{% elif p.qty < threshold %}badge-amber{% else %}badge-green{% endif %}">{{ p.qty }}</span></td>
+        <tr class="transition hover:bg-[#0e6dfa]/[0.03] {% if not p.active %}opacity-60{% endif %}">
+          <td class="px-5 py-3">
+            <div class="flex items-center gap-3">
+              {% product_badge p 'h-9 w-9 text-xs' %}
+              <div class="min-w-0">
+                <span class="font-semibold" style="color:{{ p.text_color }}">{{ p.title }}</span>
+                {% if not p.active %}<span class="ml-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold text-slate-500">retiré</span>{% endif %}
+                {% if p.barcode %}<span class="block text-xs tabular-nums text-slate-400">{{ p.barcode }}</span>{% endif %}
+              </div>
+            </div>
+          </td>
+          <td class="px-5 py-3 text-slate-600"><span class="inline-flex items-center gap-1.5 whitespace-nowrap">{% color_dot p.category.color %}{{ p.category.title }}</span></td>
+          <td class="px-5 py-3 text-right whitespace-nowrap">
+            <span class="font-bold tabular-nums text-slate-900">{{ p.final_value|money }}</span>
+            {% if p.discount_value %}<span class="block text-xs tabular-nums text-slate-400 line-through">{{ p.value|money }}</span>{% endif %}
+          </td>
+          {% if is_mgr %}<td class="px-5 py-3 text-right whitespace-nowrap tabular-nums text-slate-500">{{ p.prix_achat|money }}</td>{% endif %}
+          <td class="px-5 py-3 text-right">
+            {% if p.qty == 0 %}
+            <span class="inline-flex rounded-lg bg-rose-50 px-2 py-0.5 text-xs font-bold whitespace-nowrap text-rose-600">Rupture</span>
+            {% elif p.qty < threshold %}
+            <span class="inline-flex min-w-9 justify-center rounded-lg bg-[#fbc105]/20 px-2 py-0.5 text-xs font-bold tabular-nums text-[#7a5a00]">{{ p.qty }}</span>
+            {% else %}
+            <span class="inline-flex min-w-9 justify-center rounded-lg bg-[#1b8650]/10 px-2 py-0.5 text-xs font-bold tabular-nums text-[#1b8650]">{{ p.qty }}</span>
+            {% endif %}
+          </td>
           {% if is_mgr %}
-          <td class="whitespace-nowrap text-right">
-            <a href="{% url 'product:quick_stock' p.pk %}" class="btn btn-light btn-sm">{% icon 'truck' 'h-4 w-4' %} Stock</a>
-            <a href="{% url 'product:edit_product' p.pk %}" class="btn btn-ghost btn-sm" aria-label="Modifier">{% icon 'edit' 'h-4 w-4' %}</a>
+          <td class="px-5 py-3 text-right whitespace-nowrap">
+            <a href="{% url 'product:quick_stock' p.pk %}" class="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-[#0e6dfa] transition hover:bg-[#0e6dfa]/10">{% icon 'truck' 'h-4 w-4' %} Stock</a>
+            <a href="{% url 'product:edit_product' p.pk %}" class="inline-grid h-8 w-8 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 align-middle" aria-label="Modifier">{% icon 'edit' 'h-4 w-4' %}</a>
           </td>
           {% endif %}
         </tr>
       {% empty %}
-        <tr><td colspan="6" class="py-10 text-center text-slate-500">Aucun produit.{% if is_mgr %} <a href="{% url 'product:add_product' %}" class="font-semibold text-navy-700 underline">Ajouter le premier</a>{% endif %}</td></tr>
+        <tr><td colspan="6" class="px-5 py-14 text-center text-slate-500">
+          Aucun produit{% if q or category or status %} pour ces filtres{% endif %}.
+          {% if is_mgr and not q and not category %}<a href="{% url 'product:add_product' %}" class="ml-1 font-semibold text-[#0e6dfa] hover:underline">Ajouter le premier</a>{% endif %}
+        </td></tr>
       {% endfor %}
       </tbody>
     </table>
   </div>
   {% include 'partials/pagination.html' %}
-</div>
+</section>
 {% endwith %}
 {% endblock %}
