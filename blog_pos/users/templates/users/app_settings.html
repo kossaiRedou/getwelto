@@ -1,30 +1,73 @@
 {% extends 'base.html' %}
 {% load welto %}
 {% block title %}Paramètres{% endblock %}
+{% block body_class %}bg-[#f3f6fb]{% endblock %}
+{% block head %}{% include 'partials/dash_styles.html' %}{% endblock %}
 {% block content %}
-<div class="mx-auto max-w-4xl">
-  <div class="page-header">
-    <div><h1 class="page-title">Paramètres</h1><p class="page-subtitle">Identité de la boutique, devise, factures et tickets.</p></div>
+{% with s=form.initial %}
+<div class="mx-auto max-w-5xl">
+  <div class="mb-6">
+    <p class="text-sm font-medium text-slate-500">Identité, devise, factures et tickets</p>
+    <h1 class="mt-0.5 text-2xl font-bold tracking-tight text-slate-900">Paramètres</h1>
   </div>
-  <form method="post" enctype="multipart/form-data" class="card p-5 sm:p-8">{% csrf_token %}
+
+  {# ---------- Aperçu de la boutique ---------- #}
+  <div class="d-card d-hero mb-6 p-5 sm:p-6">
+    <div class="flex flex-wrap items-center gap-4">
+      {% if s.company_logo %}
+      <img src="{{ s.company_logo.url }}" alt="" class="h-16 w-16 shrink-0 rounded-2xl bg-white object-contain p-1.5 shadow-[0_8px_20px_-8px_rgba(0,0,0,.35)]">
+      {% else %}
+      <span class="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-white text-2xl font-bold text-[#0e6dfa] shadow-[0_8px_20px_-8px_rgba(0,0,0,.35)]">{{ s.company_name|default:"W"|slice:":1"|upper }}</span>
+      {% endif %}
+      <div class="min-w-0 flex-1">
+        <p class="text-xs font-semibold tracking-wide text-white/70">Ce que voient vos clients</p>
+        <p class="truncate text-xl font-bold tracking-tight">{{ s.company_name|default:"Nom de la boutique" }}</p>
+        <p class="truncate text-sm text-white/80">{{ s.company_tagline|default:"Activité ou slogan" }}</p>
+      </div>
+      <div class="flex flex-wrap gap-2 text-xs">
+        <span class="rounded-full bg-white/15 px-3 py-1 font-semibold">Devise : {{ s.currency_label|default:"—" }}</span>
+        <span class="rounded-full bg-white/15 px-3 py-1 font-semibold">Stock bas &lt; {{ s.low_stock_threshold }}</span>
+      </div>
+    </div>
+  </div>
+
+  <form method="post" enctype="multipart/form-data" class="space-y-5">{% csrf_token %}
     {% include 'partials/form_errors.html' %}
-    <section class="form-section">
-      <div><h2 class="form-section-title">Boutique</h2><p class="form-section-desc">Affiché dans le menu, sur les tickets et les factures.</p></div>
+
+    {# ---------- Boutique ---------- #}
+    <section class="d-card d-tint-blue grid gap-5 p-5 sm:p-6 lg:grid-cols-3 lg:gap-8">
+      <div>
+        <span class="d-chip mb-3 bg-[#0e6dfa]/10 text-[#0e6dfa]">{% icon 'box' 'h-[18px] w-[18px]' %}</span>
+        <h2 class="d-title">Boutique</h2>
+        <p class="mt-1 text-sm text-slate-500">Nom et logo affichés dans le menu, sur les tickets et les factures.</p>
+      </div>
       <div class="grid gap-4 sm:grid-cols-2 lg:col-span-2">
         {% include 'partials/field.html' with field=form.company_name %}
         {% include 'partials/field.html' with field=form.company_tagline %}
         {% include 'partials/field.html' with field=form.company_logo class='sm:col-span-2' %}
       </div>
     </section>
-    <section class="form-section">
-      <div><h2 class="form-section-title">Vente et stock</h2><p class="form-section-desc">La devise s'affiche après chaque montant. Sous le seuil, un produit est signalé « stock bas ».</p></div>
+
+    {# ---------- Vente et stock ---------- #}
+    <section class="d-card d-tint-green grid gap-5 p-5 sm:p-6 lg:grid-cols-3 lg:gap-8">
+      <div>
+        <span class="d-chip mb-3 bg-[#1b8650]/10 text-[#1b8650]">{% icon 'cash' 'h-[18px] w-[18px]' %}</span>
+        <h2 class="d-title">Vente et stock</h2>
+        <p class="mt-1 text-sm text-slate-500">La devise suit chaque montant. Sous le seuil, un produit passe en « stock bas » <span class="ml-0.5 inline-block h-2 w-2 rounded-full bg-[#fbc105] align-middle"></span>.</p>
+      </div>
       <div class="grid gap-4 sm:grid-cols-2 lg:col-span-2">
         {% include 'partials/field.html' with field=form.currency_label %}
         {% include 'partials/field.html' with field=form.low_stock_threshold %}
       </div>
     </section>
-    <section class="form-section">
-      <div><h2 class="form-section-title">Factures PDF</h2><p class="form-section-desc">Couleur des titres, signature et cachet apposés sur les factures.</p></div>
+
+    {# ---------- Factures ---------- #}
+    <section class="d-card d-tint-yellow grid gap-5 p-5 sm:p-6 lg:grid-cols-3 lg:gap-8">
+      <div>
+        <span class="d-chip mb-3 bg-[#fbc105]/25 text-[#7a5a00]">{% icon 'receipt' 'h-[18px] w-[18px]' %}</span>
+        <h2 class="d-title">Factures et documents</h2>
+        <p class="mt-1 text-sm text-slate-500">Couleur des titres, signature et cachet apposés sur les factures PDF.</p>
+      </div>
       <div class="grid gap-4 sm:grid-cols-2 lg:col-span-2">
         {% include 'partials/field.html' with field=form.brand_color_primary %}
         {% include 'partials/field.html' with field=form.signatory_name %}
@@ -32,9 +75,16 @@
         {% include 'partials/field.html' with field=form.stamp_image %}
       </div>
     </section>
-    <div class="form-actions">
-      <button class="btn btn-primary">{% icon 'check' 'h-4 w-4' %} Enregistrer</button>
+
+    {# ---------- Enregistrer ---------- #}
+    <div class="d-card flex flex-wrap items-center justify-between gap-3 p-4">
+      <p class="flex items-center gap-2 text-sm text-slate-500">
+        <span class="grid h-6 w-6 place-items-center rounded-full bg-[#1b8650]/10 text-[#1b8650]">{% icon 'check' 'h-3.5 w-3.5' %}</span>
+        Les changements s'appliquent tout de suite à la caisse, aux tickets et aux factures.
+      </p>
+      <button class="inline-flex h-10 items-center gap-2 rounded-xl bg-[#0e6dfa] px-5 text-sm font-semibold text-white shadow-[0_8px_18px_-8px_rgba(14,109,250,.8)] transition hover:bg-[#0a52c6]">{% icon 'check' 'h-4 w-4' %} Enregistrer</button>
     </div>
   </form>
 </div>
+{% endwith %}
 {% endblock %}
