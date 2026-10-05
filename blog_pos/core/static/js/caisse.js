@@ -377,7 +377,7 @@
     }).then(function (res) {
       busy = false;
       var data = res.data;
-      if (data.ok) return saleDone(data.order, data.replayed);
+      if (data.ok) { showMyDay(data.my_day); return saleDone(data.order, data.replayed); }
       beep(false);
       toast(data.error || 'Vente refusée.');
       if (data.code === 'client_required') openClient(data.error);
@@ -394,6 +394,15 @@
       beep(false);
       toast("Connexion lente ou coupée : la vente n'est pas confirmée. Appuyez à nouveau sur Valider — elle ne sera jamais enregistrée deux fois.");
     });
+  }
+
+  // Bandeau « Ma journée » (employé) : chiffres renvoyés par le serveur après chaque vente.
+  function showMyDay(day) {
+    var box = document.getElementById('my-day');
+    if (!box || !day) return;
+    box.querySelector('[data-count]').textContent = day.count;
+    box.querySelector('[data-plural]').textContent = day.count > 1 ? 's' : '';
+    box.querySelector('[data-collected]').textContent = fmt(day.collected);
   }
 
   function saleDone(order, replayed) {

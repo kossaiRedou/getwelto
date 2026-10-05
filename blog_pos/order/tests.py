@@ -1,3 +1,4 @@
+import datetime
 import json
 import uuid
 from decimal import Decimal
@@ -5,8 +6,9 @@ from decimal import Decimal
 from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
-from aprovision.models import Depense, MouvementStock, TypeMouvement
+from aprovision.models import Depense, MouvementStock, TypeDepense, TypeMouvement
 from aprovision.services import StockError, adjust_stock, restock
 from client.models import Client
 from product.models import Product
@@ -367,6 +369,19 @@ class ApiTests(SaleTestCase):
         self.assertEqual(self.client.get(reverse('api_catalog')).status_code, 401)
         self.assertEqual(self.post_json(reverse('api_checkout'), {}).status_code, 401)
 
+    def test_my_day_for_employee(self):
+        other = User.objects.create_user('autre', password='motdepasse123', role='employee')
+        checkout(lines=[{'product_id': self.savon.pk, 'qty': 1}], user=other, method='cash')   # pas à lui
+        self.sell([(self.coca, 1)])                                                           # 2000 encaissés
+        self.client.force_login(self.user)
+        self.assertEqual(self.client.get(reverse('pos')).context['my_day'], {'count': 1, 'collected': D('2000')})
+        r = self.post_json(reverse('api_checkout'), {'lines': [{'product_id': self.riz.pk, 'qty': 1}], 'method': 'credit',
+                                                     'amount': '5000', 'client_id': self.client_.pk})
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(r.json()['my_day'], {'count': 2, 'collected': 700000})   # centimes : 2000 + 5000
+        self.client.force_login(self.manager)
+        self.assertIsNone(self.client.get(reverse('pos')).context['my_day'])         # le gérant a le tableau de bord
+
     def test_catalog_and_etag(self):
         self.client.force_login(self.user)
         r = self.client.get(reverse('api_catalog'))
@@ -413,6 +428,79 @@ class ApiTests(SaleTestCase):
         self.sell([(self.riz, 1)], method='credit', client_id=self.client_.pk)
         found = self.client.get(reverse('client:api_search'), {'q': 'mamadou'}).json()['clients']
         self.assertEqual(found[0]['debt'], 2500000)
+
+
+class DashboardTests(SaleTestCase):
+    """Tableau de bord fusionné : chiffres exacts de la période et comparaison."""
+
+    def test_previous_period(self):
+        from .stats import previous_period
+        d = datetime.date
+        cases = [
+            ((d(2026, 10, 5), d(2026, 10, 5)), (d(2026, 10, 4), d(2026, 10, 4))),     # aujourd'hui → hier
+            ((d(2026, 9, 29), d(2026, 10, 5)), (d(2026, 9, 22), d(2026, 9, 28))),     # 7 jours → 7 d'avant
+            ((d(2026, 10, 1), d(2026, 10, 5)), (d(2026, 9, 1), d(2026, 9, 5))),       # mois commencé
+            ((d(2026, 10, 1), d(2026, 10, 31)), (d(2026, 9, 1), d(2026, 9, 30))),     # mois entier
+            ((d(2026, 3, 1), d(2026, 3, 31)), (d(2026, 2, 1), d(2026, 2, 28))),
+            ((d(2026, 3, 1), d(2026, 3, 30)), (d(2026, 2, 1), d(2026, 2, 28))),
+            ((d(2026, 1, 1), d(2026, 1, 10)), (d(2025, 12, 1), d(2025, 12, 10))),
+        ]
+        for period, expected in cases:
+            with self.subTest(period=period):
+                self.assertEqual(previous_period(*period), expected)
+
+    def test_change(self):
+        from .stats import change
+        self.assertIsNone(change(D('500'), D('0')))
+        self.assertEqual(change(D('150'), D('100')), {'pct': 50, 'abs': 50, 'good': True})
+        self.assertEqual(change(D('150'), D('100'), higher_is_better=False)['good'], False)
+        self.assertEqual(change(D('-50'), D('-100'))['pct'], 50)     # perte réduite = mieux
+        self.assertTrue(change(D('100'), D('100'), higher_is_better=False)['good'])
+
+    def test_figures_today_vs_yesterday(self):
+        today = timezone.localdate()
+        yesterday = today - datetime.timedelta(days=1)
+        old = self.sell([(self.savon, 2)]).order                      # 6000, coût 4000
+        Order.objects.filter(pk=old.pk).update(date=yesterday)
+        Payment.objects.filter(order=old).update(date=yesterday)
+        self.sell([(self.coca, 2)])                                   # 4000, coût 3000, payé
+        self.sell([(self.riz, 1)], method='credit', amount='5000', client_id=self.client_.pk)   # 25000, coût 21000
+        loyer = TypeDepense.objects.create(nom='Loyer')
+        Depense.objects.create(type_depense=loyer, description='Loyer', montant=D('1000'))
+        appro, _ = TypeDepense.objects.get_or_create(nom='Approvisionnement')
+        Depense.objects.create(type_depense=appro, description='Achat', montant=D('50000'))
+
+        self.client.force_login(self.manager)
+        ctx = self.client.get(reverse('dashboard')).context
+        self.assertEqual((ctx['start'], ctx['end'], ctx['single_day']), (today, today, True))
+        self.assertEqual(ctx['sales']['total'], D('29000'))
+        self.assertEqual(ctx['sales']['count'], 2)
+        self.assertEqual(ctx['sales']['remaining'], D('20000'))
+        self.assertEqual(ctx['avg_basket'], D('14500'))
+        self.assertEqual(ctx['cogs'], D('24000'))
+        self.assertEqual(ctx['margin'], D('5000'))
+        self.assertEqual(ctx['other_total'], D('1000'))               # achats de marchandises exclus
+        self.assertEqual(ctx['net'], D('4000'))
+        self.assertEqual(ctx['purchases'], D('50000'))
+        self.assertEqual(ctx['collected'], D('9000'))
+        self.assertEqual(ctx['qty_sold'], 3)
+        self.assertEqual(ctx['unpaid_total'], D('20000'))
+        self.assertEqual(ctx['prev']['sales']['total'], D('6000'))
+        self.assertEqual(ctx['delta']['sales']['pct'], 383)
+        self.assertEqual(ctx['delta']['margin']['pct'], 150)
+        self.assertIsNone(ctx['delta']['other'])                      # rien hier : pas de %
+        self.assertEqual(len(ctx['series']), 7)                       # un jour → la semaine
+        self.assertTrue(ctx['series'][-1]['hl'])
+
+        ctx = self.client.get(reverse('dashboard'), {'start': yesterday, 'end': today}).context
+        self.assertEqual(ctx['sales']['total'], D('35000'))
+        self.assertEqual(ctx['margin'], D('7000'))
+        self.assertEqual(len(ctx['series']), 2)
+
+    def test_old_reports_url_redirects(self):
+        self.client.force_login(self.manager)
+        r = self.client.get(reverse('aprovision:reports'), {'start': '2020-01-01', 'end': '2020-01-31'})
+        self.assertRedirects(r, reverse('dashboard') + '?start=2020-01-01&end=2020-01-31', fetch_redirect_response=False)
 
 
 from django.db import connection

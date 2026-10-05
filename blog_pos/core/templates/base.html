@@ -27,7 +27,6 @@
     {% if request.user|manager %}
     <p class="nav-section px-3 pt-4 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Gestion</p>
     <a href="{% url 'dashboard' %}" title="Tableau de bord" class="nav-link {% if rm.url_name == 'dashboard' %}active{% endif %}">{% icon 'dashboard' %}<span class="nav-label">Tableau de bord</span></a>
-    <a href="{% url 'aprovision:reports' %}" title="Rapports" class="nav-link {% if rm.url_name == 'reports' %}active{% endif %}">{% icon 'chart' %}<span class="nav-label">Rapports</span></a>
     <a href="{% url 'aprovision:depense_list' %}" title="Dépenses" class="nav-link {% if rm.url_name == 'depense_list' or rm.url_name == 'nouvelle_depense' %}active{% endif %}">{% icon 'wallet' %}<span class="nav-label">Dépenses</span></a>
     <a href="{% url 'aprovision:mouvement_list' %}" title="Mouvements de stock" class="nav-link {% if rm.url_name == 'mouvement_list' %}active{% endif %}">{% icon 'layers' %}<span class="nav-label">Mouvements de stock</span></a>
     <a href="{% url 'users:user_list' %}" title="Utilisateurs" class="nav-link {% if rm.namespace == 'users' and rm.url_name != 'app_settings' and rm.url_name != 'my_password_change' %}active{% endif %}">{% icon 'user' %}<span class="nav-label">Utilisateurs</span></a>

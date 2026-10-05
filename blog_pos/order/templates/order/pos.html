@@ -37,6 +37,14 @@
 
   {# ------------------------------------------------ Panier + encaissement #}
   <section class="flex min-h-0 flex-1 flex-col bg-navy-900 lg:w-[430px] lg:flex-none lg:border-l lg:border-navy-800 [.searching_&]:hidden lg:[.searching_&]:flex">
+    {% if my_day %}
+    <p id="my-day" class="flex items-center gap-2 border-b border-navy-800 px-4 py-2 text-xs text-slate-400" title="Vos ventes et vos encaissements d'aujourd'hui">
+      <span class="font-semibold text-slate-300">Ma journée</span>
+      <span><b data-count class="tabular-nums text-white">{{ my_day.count }}</b> vente<span data-plural>{{ my_day.count|pluralize }}</span></span>
+      <span aria-hidden="true">·</span>
+      <span><b data-collected class="tabular-nums text-emerald-300">{{ my_day.collected|money }}</b> {{ currency }} encaissés</span>
+    </p>
+    {% endif %}
     <div class="flex items-center justify-between px-4 pt-3 text-sm">
       <span class="font-semibold text-slate-300">Panier <span id="cart-count" class="text-slate-500"></span></span>
       <button id="cart-clear" type="button" class="hidden rounded-lg px-2 py-1 text-slate-400 hover:bg-navy-800 hover:text-white">Vider</button>

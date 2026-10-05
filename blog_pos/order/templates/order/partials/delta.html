@@ -1,0 +1,8 @@
+{% load welto %}
+{# Variation vs la période précédente. Variables : d (stats.change), before (montant précédent), dark (carte bleue). #}
+<div class="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs {% if dark %}text-white/80{% else %}text-slate-500{% endif %}">
+  {% if d %}
+  <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-semibold tabular-nums {% if dark %}bg-white/15 text-white{% elif d.good %}bg-[#1b8650]/10 text-[#1b8650]{% else %}bg-rose-50 text-rose-600{% endif %}">{% if d.pct > 0 %}▲{% elif d.pct < 0 %}▼{% else %}={% endif %} {{ d.abs }} %</span>
+  {% endif %}
+  <span>{% if single_day %}{% if start == today %}Hier{% else %}La veille{% endif %}{% else %}Avant{% endif %} : <b class="font-semibold tabular-nums {% if dark %}text-white{% else %}text-slate-700{% endif %}">{{ before|money }}</b></span>
+</div>

@@ -13,7 +13,7 @@ from django.views.decorators.http import require_GET, require_POST
 
 from aprovision.models import MouvementStock
 from aprovision.services import StockError, adjust_stock, receive, restock
-from core.decorators import api_login_required, manager_required
+from core.decorators import api_login_required, is_manager, manager_required
 from core.utils import json_etag_response, to_cents
 from users.models import AppSetting
 from .forms import CategoryForm, ProductForm, StockForm
@@ -207,7 +207,7 @@ def api_receive(request):
         result = receive(payload.get('lines'), user=request.user, key=key,
                          fournisseur=str(payload.get('fournisseur') or ''),
                          reference=str(payload.get('reference') or ''),
-                         can_set_price=request.user.is_manager())
+                         can_set_price=is_manager(request.user))
     except StockError as exc:
         return JsonResponse({'ok': False, 'error': str(exc)}, status=400)
     if result is None:

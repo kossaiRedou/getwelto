@@ -12,13 +12,12 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
-from aprovision.models import Depense
-from core.decorators import api_login_required, manager_required
+from core.decorators import api_login_required, is_manager, manager_required
 from core.utils import format_money, json_etag_response, parse_iso_date, to_cents
 from product.models import DEFAULT_CATEGORY_COLOR, Category, Product, get_low_stock_threshold
 from users.models import AppSetting
-from . import services
-from .models import Order, OrderItem, PaymentMethod
+from . import services, stats
+from .models import Order, Payment, PaymentMethod
 
 ZERO = services.ZERO
 
@@ -29,6 +28,7 @@ ZERO = services.ZERO
 def pos_view(request):
     return render(request, 'order/pos.html', {
         'methods': PaymentMethod.choices,
+        'my_day': None if is_manager(request.user) else stats.user_day(request.user, timezone.localdate()),
     })
 
 
@@ -70,9 +70,11 @@ def api_checkout(request):
         return JsonResponse({'ok': False, 'error': exc.message, 'code': exc.code, 'data': exc.data},
                             status=status)
     order = result.order
+    day = stats.user_day(request.user, timezone.localdate())
     return JsonResponse({
         'ok': True,
         'replayed': result.replayed,
+        'my_day': {'count': day['count'], 'collected': to_cents(day['collected'])},
         'order': {
             'id': order.pk,
             'number': order.title,
@@ -204,64 +206,95 @@ def order_cancel(request, pk):
 
 # ---------------------------------------------------------------- Tableau de bord
 
-def sales_summary(orders):
-    agg = orders.aggregate(n=Count('id'), total=Sum('final_value'), paid=Sum('amount_paid'))
-    total = agg['total'] or ZERO
-    paid = agg['paid'] or ZERO
-    return {'count': agg['n'], 'total': total, 'paid': paid, 'remaining': total - paid}
-
-
-def daily_series(orders, start, end):
-    """Total des ventes par jour (jours sans vente inclus), pour les graphiques SVG."""
-    rows = dict(orders.values('date').annotate(t=Sum('final_value')).values_list('date', 't'))
-    days = []
-    day = start
-    while day <= end:
-        days.append({'date': day, 'total': rows.get(day) or ZERO})
-        day += datetime.timedelta(days=1)
-    peak = max((d['total'] for d in days), default=ZERO)
-    for d in days:
-        d['pct'] = int(d['total'] * 100 / peak) if peak > 0 else 0
-    return days
+def _dashboard_presets(today):
+    yesterday = today - datetime.timedelta(days=1)
+    month_start = today.replace(day=1)
+    last_month_end = month_start - datetime.timedelta(days=1)
+    return [
+        ("Aujourd'hui", today, today),
+        ('Hier', yesterday, yesterday),
+        ('7 jours', today - datetime.timedelta(days=6), today),
+        ('Ce mois', month_start, today),
+        ('Mois dernier', last_month_end.replace(day=1), last_month_end),
+        ('30 jours', today - datetime.timedelta(days=29), today),
+    ]
 
 
 @manager_required
 def dashboard_view(request):
+    """Tableau de bord unique : chiffres de la période choisie (aujourd'hui par défaut),
+    comparés à la période précédente, plus la situation du moment (crédits, stock bas)."""
     today = timezone.localdate()
-    week_start = today - datetime.timedelta(days=6)
-    month_start = today.replace(day=1)
-    orders = Order.objects.all()
+    start = parse_iso_date(request.GET.get('start'), today)
+    end = parse_iso_date(request.GET.get('end'), today)
+    if start > end:
+        start, end = end, start
+    days = (end - start).days + 1
 
-    today_stats = sales_summary(orders.filter(date=today))
-    yesterday_stats = sales_summary(orders.filter(date=today - datetime.timedelta(days=1)))
-    month_orders = orders.filter(date__gte=month_start, date__lte=today)
-    month_stats = sales_summary(month_orders)
+    cur = stats.period_figures(start, end)
+    prev_start, prev_end = stats.previous_period(start, end)
+    prev = stats.period_figures(prev_start, prev_end)
+    sales = cur['sales']
 
-    month_cost = (OrderItem.objects.filter(order__in=month_orders)
-                  .aggregate(c=Sum(F('qty') * F('cost_price')))['c'] or ZERO)
-    month_expenses = (Depense.objects.filter(date_depense__gte=month_start, date_depense__lte=today)
-                      .exclude(type_depense__nom='Approvisionnement')
-                      .aggregate(s=Sum('montant'))['s'] or ZERO)
+    payments = Payment.objects.filter(date__gte=start, date__lte=end)
+    collected = payments.aggregate(s=Sum('amount'))['s'] or ZERO
+    labels = dict(PaymentMethod.choices)
+    by_method = [{'label': labels.get(row['method'], row['method']), 'total': row['s']}
+                 for row in payments.values('method').annotate(s=Sum('amount')).order_by('-s')]
 
-    unpaid = orders.filter(is_paid=False).aggregate(
+    # Un seul jour : on montre la semaine qui se termine ce jour-là, jour choisi en avant.
+    if days == 1:
+        series = stats.daily_series(Order.objects.all(), end - datetime.timedelta(days=6), end)
+        for d in series:
+            d['hl'] = d['date'] == end
+    elif days <= 62:
+        series = stats.daily_series(cur['orders'], start, end)
+        for d in series:
+            d['hl'] = d['pct'] == 100
+    else:
+        series = None
+
+    unpaid = Order.objects.filter(is_paid=False).aggregate(
         s=Sum(F('final_value') - F('amount_paid')), n=Count('id'))
     threshold = get_low_stock_threshold()
+    low_stock = Product.objects.filter(active=True, qty__lt=threshold)
 
     return render(request, 'order/dashboard.html', {
         'today': today,
-        'today_stats': today_stats,
-        'yesterday_stats': yesterday_stats,
-        'month_stats': month_stats,
-        'month_margin': month_stats['total'] - month_cost,
-        'month_expenses': month_expenses,
-        'month_net': month_stats['total'] - month_cost - month_expenses,
+        'start': start,
+        'end': end,
+        'single_day': days == 1,
+        'prev_start': prev_start,
+        'prev_end': prev_end,
+        'presets': _dashboard_presets(today),
+        'sales': sales,
+        'prev': prev,
+        'avg_basket': (sales['total'] / sales['count']) if sales['count'] else ZERO,
+        'qty_sold': cur['units'],
+        'cogs': cur['cogs'],
+        'margin': cur['margin'],
+        'other_total': cur['other_total'],
+        'net': cur['net'],
+        'delta': {
+            'sales': stats.change(sales['total'], prev['sales']['total']),
+            'margin': stats.change(cur['margin'], prev['margin']),
+            'other': stats.change(cur['other_total'], prev['other_total'], higher_is_better=False),
+            'net': stats.change(cur['net'], prev['net']),
+        },
+        'missing_cost': cur['items'].filter(cost_price=0).values('product').distinct().count(),
+        'collected': collected,
+        'by_method': by_method,
+        'purchases': cur['expenses'].filter(type_depense__nom=stats.APPRO).aggregate(s=Sum('montant'))['s'] or ZERO,
+        'other_by_type': cur['other'].values('type_depense__nom').annotate(s=Sum('montant')).order_by('-s'),
+        'series': series,
+        'top_products': (cur['items'].values('product__title').annotate(qty=Sum('qty'), total=Sum('total_price'))
+                         .order_by('-total')[:10]),
+        'by_category': (cur['items'].values('product__category__title', 'product__category__color')
+                        .annotate(qty=Sum('qty'), total=Sum('total_price')).order_by('-total')),
         'unpaid_total': unpaid['s'] or ZERO,
         'unpaid_count': unpaid['n'],
-        'week': daily_series(orders, week_start, today),
-        'top_products': (OrderItem.objects.filter(order__in=month_orders)
-                         .values('product__title').annotate(qty=Sum('qty'), total=Sum('total_price'))
-                         .order_by('-qty')[:5]),
-        'low_stock': Product.objects.filter(active=True, qty__lt=threshold).order_by('qty', 'title')[:8],
         'threshold': threshold,
-        'recent_orders': orders.select_related('client')[:6],
+        'low_count': low_stock.count(),
+        'low_stock': low_stock.order_by('qty', 'title')[:8],
+        'recent_orders': Order.objects.select_related('client')[:6],
     })

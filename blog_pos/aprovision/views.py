@@ -5,13 +5,13 @@ from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db.models import Count, F, Sum
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from core.decorators import manager_required
 from core.utils import parse_iso_date
 from order.models import Order, OrderItem, Payment, PaymentMethod
-from order.views import daily_series, sales_summary
 from product.models import Product
 from .forms import DepenseForm
 from .models import Depense, MouvementStock, TypeDepense, TypeMouvement
@@ -31,54 +31,11 @@ def _period(request, default_start):
 
 @manager_required
 def reports_view(request):
-    today = timezone.localdate()
-    start, end = _period(request, today.replace(day=1))
-
-    orders = Order.objects.filter(date__gte=start, date__lte=end)
-    sales = sales_summary(orders)
-    items = OrderItem.objects.filter(order__in=orders)
-    item_agg = items.aggregate(units=Sum('qty'), cost=Sum(F('qty') * F('cost_price')))
-    cogs = item_agg['cost'] or ZERO
-
-    payments = Payment.objects.filter(date__gte=start, date__lte=end)
-    labels = dict(PaymentMethod.choices)
-    by_method = [{'label': labels.get(row['method'], row['method']), 'total': row['s']}
-                 for row in payments.values('method').annotate(s=Sum('amount')).order_by('-s')]
-
-    expenses = Depense.objects.filter(date_depense__gte=start, date_depense__lte=end)
-    purchases = expenses.filter(type_depense__nom=APPRO).aggregate(s=Sum('montant'))['s'] or ZERO
-    other = expenses.exclude(type_depense__nom=APPRO)
-    other_total = other.aggregate(s=Sum('montant'))['s'] or ZERO
-    margin = sales['total'] - cogs
-
-    days = (end - start).days + 1
-    return render(request, 'aprovision/reports.html', {
-        'start': start,
-        'end': end,
-        'sales': sales,
-        'qty_sold': item_agg['units'] or 0,
-        'avg_basket': (sales['total'] / sales['count']) if sales['count'] else ZERO,
-        'cogs': cogs,
-        'margin': margin,
-        'missing_cost': items.filter(cost_price=0).values('product').distinct().count(),
-        'collected': payments.aggregate(s=Sum('amount'))['s'] or ZERO,
-        'by_method': by_method,
-        'purchases': purchases,
-        'other_total': other_total,
-        'other_by_type': other.values('type_depense__nom').annotate(s=Sum('montant')).order_by('-s'),
-        'net': margin - other_total,
-        'series': daily_series(orders, start, end) if days <= 62 else None,
-        'top_products': items.values('product__title').annotate(qty=Sum('qty'), total=Sum('total_price'))
-                             .order_by('-total')[:10],
-        'by_category': items.values('product__category__title', 'product__category__color').annotate(qty=Sum('qty'), total=Sum('total_price'))
-                            .order_by('-total'),
-        'presets': [
-            ("Aujourd'hui", today, today),
-            ('7 jours', today - datetime.timedelta(days=6), today),
-            ('Ce mois', today.replace(day=1), today),
-            ('30 jours', today - datetime.timedelta(days=29), today),
-        ],
-    })
+    """Ancienne page « Rapports » : fusionnée dans le tableau de bord."""
+    url = reverse('dashboard')
+    if request.GET:
+        url += '?' + request.GET.urlencode()
+    return redirect(url)
 
 
 @manager_required
