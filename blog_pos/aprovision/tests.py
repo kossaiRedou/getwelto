@@ -123,11 +123,6 @@ class ReceptionTests(TestCase):
     def test_api_and_page_access(self):
         payload = {'lines': [{'product_id': self.riz.pk, 'qty': 2, 'unit_cost': '20000'}], 'key': str(uuid.uuid4())}
         self.assertEqual(self.post(payload).status_code, 401)
-        self.client.force_login(self.employee)
-        self.assertEqual(self.post(payload).status_code, 403)
-        self.assertEqual(self.client.get(reverse('product:api_stock_catalog')).status_code, 403)
-        self.assertRedirects(self.client.get(reverse('product:restock')), reverse('pos'), fetch_redirect_response=False)
-
         self.client.force_login(self.manager)
         self.assertEqual(self.client.get(reverse('product:restock')).status_code, 200)
         r = self.post(payload)
@@ -144,3 +139,21 @@ class ReceptionTests(TestCase):
         rows = {r[1]: r for r in self.client.get(reverse('product:api_stock_catalog')).json()['products']}
         self.assertEqual(rows['Riz 5kg'][6], 2000000)   # prix d'achat en centimes
         self.assertEqual(rows['Huile 1L'][7], 0)        # retiré de la vente, mais présent
+
+    def test_employee_can_receive_goods(self):
+        """L'employé fait la réception de sa boutique : page, catalogue et enregistrement."""
+        self.client.force_login(self.employee)
+        self.assertEqual(self.client.get(reverse('product:restock')).status_code, 200)
+        self.assertEqual(self.client.get(reverse('product:api_stock_catalog')).status_code, 200)
+        r = self.post({'lines': [{'product_id': self.riz.pk, 'qty': 3, 'unit_cost': '20000'}],
+                       'key': str(uuid.uuid4())})
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(self.qty(self.riz), 13)
+        mv = MouvementStock.objects.filter(produit=self.riz).latest('id')
+        self.assertEqual(mv.created_by, self.employee)
+
+    def test_employee_still_kept_out_of_management(self):
+        self.client.force_login(self.employee)
+        for name in ('dashboard', 'aprovision:reports', 'aprovision:depense_list', 'product:add_product'):
+            with self.subTest(page=name):
+                self.assertRedirects(self.client.get(reverse(name)), reverse('pos'), fetch_redirect_response=False)

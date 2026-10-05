@@ -13,7 +13,7 @@ from django.views.decorators.http import require_GET, require_POST
 
 from aprovision.models import MouvementStock
 from aprovision.services import StockError, adjust_stock, receive, restock
-from core.decorators import api_manager_required, manager_required
+from core.decorators import api_login_required, manager_required
 from core.utils import json_etag_response, to_cents
 from users.models import AppSetting
 from .forms import CategoryForm, ProductForm, StockForm
@@ -173,14 +173,14 @@ def category_delete(request, pk):
 
 # ---------------------------------------------------------------- Approvisionnement (réception)
 
-@manager_required
+@login_required
 def restock_page(request):
     Category.get_default()
     return render(request, 'product/restock.html', {'categories': Category.objects.all()})
 
 
 @require_GET
-@api_manager_required
+@api_login_required
 def api_stock_catalog(request):
     """Catalogue de la réception : tous les produits (même retirés de la vente), avec prix d'achat."""
     rows = Product.objects.order_by('title').values_list(
@@ -196,7 +196,7 @@ def api_stock_catalog(request):
 
 
 @require_POST
-@api_manager_required
+@api_login_required
 def api_receive(request):
     try:
         payload = json.loads(request.body or b'{}')

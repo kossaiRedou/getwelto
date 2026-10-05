@@ -10,13 +10,11 @@
     <p class="text-sm font-medium text-slate-500">{{ page_obj.paginator.count }} produit{{ page_obj.paginator.count|pluralize }}</p>
     <h1 class="mt-0.5 text-2xl font-bold tracking-tight text-slate-900">Produits</h1>
   </div>
-  {% if is_mgr %}
   <div class="flex flex-wrap gap-2">
-    <a href="{% url 'product:category_management' %}" class="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 text-sm font-semibold text-slate-700 transition hover:border-[#0e6dfa]/40 hover:text-[#0e6dfa]">{% icon 'folder' 'h-4 w-4' %} Catégories</a>
+    {% if is_mgr %}<a href="{% url 'product:category_management' %}" class="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 text-sm font-semibold text-slate-700 transition hover:border-[#0e6dfa]/40 hover:text-[#0e6dfa]">{% icon 'folder' 'h-4 w-4' %} Catégories</a>{% endif %}
     <a href="{% url 'product:restock' %}" class="inline-flex h-10 items-center gap-2 rounded-xl border border-[#1b8650]/30 bg-[#1b8650]/10 px-3.5 text-sm font-semibold text-[#1b8650] transition hover:bg-[#1b8650]/15">{% icon 'truck' 'h-4 w-4' %} Approvisionner</a>
-    <a href="{% url 'product:add_product' %}" class="inline-flex h-10 items-center gap-2 rounded-xl bg-[#0e6dfa] px-4 text-sm font-semibold text-white shadow-[0_8px_18px_-8px_rgba(14,109,250,.8)] transition hover:bg-[#0a52c6]">{% icon 'plus' 'h-4 w-4' %} Ajouter</a>
+    {% if is_mgr %}<a href="{% url 'product:add_product' %}" class="inline-flex h-10 items-center gap-2 rounded-xl bg-[#0e6dfa] px-4 text-sm font-semibold text-white shadow-[0_8px_18px_-8px_rgba(14,109,250,.8)] transition hover:bg-[#0a52c6]">{% icon 'plus' 'h-4 w-4' %} Ajouter</a>{% endif %}
   </div>
-  {% endif %}
 </div>
 
 {# ---------- Filtres ---------- #}

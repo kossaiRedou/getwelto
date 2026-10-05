@@ -23,8 +23,8 @@
     <a href="{% url 'order_list' %}" title="Ventes" class="nav-link {% if rm.url_name == 'order_list' or rm.url_name == 'order_detail' %}active{% endif %}">{% icon 'receipt' %}<span class="nav-label">Ventes</span></a>
     <a href="{% url 'client:client_list' %}" title="Clients" class="nav-link {% if rm.namespace == 'client' %}active{% endif %}">{% icon 'users' %}<span class="nav-label">Clients</span></a>
     <a href="{% url 'product:product_list' %}" title="Produits" class="nav-link {% if rm.namespace == 'product' and rm.url_name != 'restock' %}active{% endif %}">{% icon 'box' %}<span class="nav-label">Produits</span></a>
-    {% if request.user|manager %}
     <a href="{% url 'product:restock' %}" title="Approvisionnement" class="nav-link {% if rm.url_name == 'restock' %}active{% endif %}">{% icon 'truck' %}<span class="nav-label">Approvisionnement</span></a>
+    {% if request.user|manager %}
     <p class="nav-section px-3 pt-4 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Gestion</p>
     <a href="{% url 'dashboard' %}" title="Tableau de bord" class="nav-link {% if rm.url_name == 'dashboard' %}active{% endif %}">{% icon 'dashboard' %}<span class="nav-label">Tableau de bord</span></a>
     <a href="{% url 'aprovision:reports' %}" title="Rapports" class="nav-link {% if rm.url_name == 'reports' %}active{% endif %}">{% icon 'chart' %}<span class="nav-label">Rapports</span></a>
