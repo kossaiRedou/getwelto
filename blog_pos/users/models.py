@@ -32,6 +32,26 @@ class User(AbstractUser):
         verbose_name='Compte actif'
     )
     
+    account = models.ForeignKey(
+        'accounts.Account',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='users',
+        verbose_name='Compte client',
+        help_text="Vide pour le propriétaire du SaaS (accès à l'admin uniquement)."
+    )
+
+    shop = models.ForeignKey(
+        'accounts.Shop',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='employees',
+        verbose_name='Boutique',
+        help_text="Boutique de l'employé (le gérant voit toutes les boutiques)."
+    )
+
     created_by = models.ForeignKey(
         'self',
         on_delete=models.SET_NULL,
@@ -51,6 +71,11 @@ class User(AbstractUser):
         verbose_name = 'Utilisateur'
         verbose_name_plural = 'Utilisateurs'
         ordering = ['-created_at']
+        constraints = [
+            # Un seul gérant (le patron) par compte client.
+            models.UniqueConstraint(fields=['account'], condition=models.Q(role='manager'),
+                                    name='user_single_manager_per_account'),
+        ]
     
     def __str__(self):
         return f"{self.get_full_name()} ({self.get_role_display()})"
@@ -148,12 +173,15 @@ class UserProfile(models.Model):
 
 
 class AppSetting(models.Model):
-    """Paramètres globaux personnalisables par le manager"""
-    currency_label = models.CharField(
-        max_length=10,
-        default='GMD',
-        verbose_name=_('Devise (label)'),
-        help_text=_('Exemple: GMD, FCFA, CFA, €')
+    """Identité et réglages d'un compte client (communs à ses boutiques).
+
+    La devise est celle du compte (un compte = un pays = une devise).
+    """
+    account = models.OneToOneField(
+        'accounts.Account',
+        on_delete=models.CASCADE,
+        related_name='app_settings',
+        verbose_name='Compte client',
     )
     low_stock_threshold = models.PositiveIntegerField(
         default=5,
@@ -227,16 +255,30 @@ class AppSetting(models.Model):
         verbose_name_plural = _('Paramètres de l\'application')
 
     def __str__(self):
-        return f"Paramètres ({self.currency_label}, seuil {self.low_stock_threshold})"
+        return f"Paramètres de {self.account}"
+
+    @property
+    def currency_label(self):
+        return self.account.currency if self.account_id else 'GNF'
 
     @classmethod
-    def get_solo(cls) -> 'AppSetting':
-        obj, _ = cls.objects.get_or_create(id=1)
+    def for_account(cls, account) -> 'AppSetting':
+        obj, _ = cls.objects.select_related('account').get_or_create(
+            account=account, defaults={'company_name': account.name})
         return obj
 
     @classmethod
+    def get_solo(cls) -> 'AppSetting':
+        """Paramètres du compte de la requête en cours (valeurs par défaut hors requête)."""
+        from accounts.scope import current_account
+        account = current_account()
+        return cls.for_account(account) if account else cls()
+
+    @classmethod
     def get_currency_label(cls) -> str:
-        return cls.get_solo().currency_label or 'GMD'
+        from accounts.scope import current_account
+        account = current_account()
+        return account.currency if account else 'GNF'
 
     @classmethod
     def get_low_stock_threshold(cls) -> int:

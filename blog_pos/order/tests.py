@@ -11,9 +11,8 @@ from django.utils import timezone
 from aprovision.models import Depense, MouvementStock, TypeDepense, TypeMouvement
 from aprovision.services import StockError, adjust_stock, restock
 from client.models import Client
-from product.models import Product
-from users.middleware import SetupMiddleware
-from users.models import User
+from product.models import Product, Stock
+from core.testing import make_account, make_employee, stock_qty
 from . import services
 from .models import Order, Payment
 from .services import SaleError, checkout
@@ -24,30 +23,29 @@ D = Decimal
 class SaleTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.user = User.objects.create_user('caisse', password='motdepasse123', role='employee', first_name='Awa')
-        cls.manager = User.objects.create_user('chef', password='motdepasse123', role='manager', first_name='Chef')
+        cls.account, (cls.shop,), cls.manager = make_account()
+        cls.user = make_employee(cls.shop, 'caisse', first_name='Awa')
 
     def setUp(self):
-        SetupMiddleware.setup_done = False
         self.coca = self.make_product('Coca-Cola 1L', '2000', qty=50, cost='1500')
         self.riz = self.make_product('Riz 5kg', '25000', qty=10, cost='21000')
         self.savon = self.make_product('Savon', '3000', qty=30, cost='2000')
-        self.client_ = Client.objects.create(name='Mamadou Bah', phone='622123456')
+        self.client_ = Client.objects.create(shop=self.shop, name='Mamadou Bah', phone='622123456')
 
     def make_product(self, title, price, qty=0, cost='0', promo='0'):
-        p = Product.objects.create(title=title, value=D(price), discount_value=D(promo), prix_achat=D(cost))
+        p = Product.objects.create(account=self.account, title=title, value=D(price), discount_value=D(promo),
+                                   prix_achat=D(cost))
         if qty:
-            adjust_stock(p.pk, 'add', qty, description='init')
+            adjust_stock(p.pk, 'add', qty, shop=self.shop, description='init')
         p.refresh_from_db()
         return p
 
     def sell(self, lines, method='cash', **kwargs):
-        return checkout(lines=[{'product_id': p.pk, 'qty': q} for p, q in lines],
+        return checkout(shop=self.shop, lines=[{'product_id': p.pk, 'qty': q} for p, q in lines],
                         user=self.user, method=method, **kwargs)
 
     def qty(self, product):
-        product.refresh_from_db()
-        return product.qty
+        return stock_qty(self.shop, product)
 
 
 class CheckoutTests(SaleTestCase):
@@ -62,7 +60,7 @@ class CheckoutTests(SaleTestCase):
         self.assertEqual(result.change, D('2000.00'))
         self.assertEqual(order.payments.get().amount, D('38000.00'))
         self.assertEqual(order.created_by, self.user)
-        self.assertEqual(order.title, f'V-{order.pk:06d}')
+        self.assertEqual(order.title, f'{self.shop.code}-000001')
         self.assertEqual(self.qty(self.coca), 48)
         self.assertEqual(self.qty(self.riz), 9)
         self.assertEqual(self.qty(self.savon), 27)
@@ -154,7 +152,7 @@ class CheckoutTests(SaleTestCase):
         self.assertEqual(self.qty(self.riz), 10)
 
     def test_negotiated_price_applies_to_this_sale_only(self):
-        result = checkout(lines=[{'product_id': self.riz.pk, 'qty': 2, 'price': '23500'},
+        result = checkout(shop=self.shop, lines=[{'product_id': self.riz.pk, 'qty': 2, 'price': '23500'},
                                  {'product_id': self.coca.pk, 'qty': 1}],
                           user=self.user, method='cash', client_id=self.client_.pk, expected_total='49000.00')
         order = result.order
@@ -171,24 +169,24 @@ class CheckoutTests(SaleTestCase):
 
     def test_negotiated_price_can_be_higher_and_works_with_promo(self):
         p = self.make_product('Huile', '10000', qty=5, promo='8500')
-        item = checkout(lines=[{'product_id': p.pk, 'qty': 1, 'price': '11000'}], user=self.user,
+        item = checkout(shop=self.shop, lines=[{'product_id': p.pk, 'qty': 1, 'price': '11000'}], user=self.user,
                         method='cash').order.order_items.get()
         self.assertEqual((item.final_price, item.catalog_price, item.price_overridden), (D('11000'), D('8500'), True))
 
     def test_negotiated_price_is_checked_against_displayed_total(self):
         with self.assertRaises(SaleError) as ctx:
-            checkout(lines=[{'product_id': self.riz.pk, 'qty': 1, 'price': '23000'}], user=self.user,
+            checkout(shop=self.shop, lines=[{'product_id': self.riz.pk, 'qty': 1, 'price': '23000'}], user=self.user,
                      method='cash', expected_total='25000')
         self.assertEqual(ctx.exception.code, 'price_changed')
 
     def test_invalid_negotiated_prices(self):
         for price in ['0', '-100', '12.345', 'abc', 1500.0]:
             with self.subTest(price=price), self.assertRaises(SaleError):
-                checkout(lines=[{'product_id': self.riz.pk, 'qty': 1, 'price': price}], user=self.user, method='cash')
+                checkout(shop=self.shop, lines=[{'product_id': self.riz.pk, 'qty': 1, 'price': price}], user=self.user, method='cash')
         with self.assertRaises(SaleError):
-            checkout(lines=[{'product_id': self.riz.pk, 'qty': 1, 'price': '23000'},
+            checkout(shop=self.shop, lines=[{'product_id': self.riz.pk, 'qty': 1, 'price': '23000'},
                             {'product_id': self.riz.pk, 'qty': 1, 'price': '24000'}], user=self.user, method='cash')
-        merged = checkout(lines=[{'product_id': self.riz.pk, 'qty': 1, 'price': '23000'},
+        merged = checkout(shop=self.shop, lines=[{'product_id': self.riz.pk, 'qty': 1, 'price': '23000'},
                                  {'product_id': self.riz.pk, 'qty': 2, 'price': '23000'}],
                           user=self.user, method='cash').order.order_items.get()
         self.assertEqual((merged.qty, merged.total_price), (3, D('69000')))
@@ -259,7 +257,7 @@ class CheckoutTests(SaleTestCase):
         for kwargs in bad:
             kwargs.setdefault('method', 'cash')
             with self.subTest(kwargs=kwargs), self.assertRaises(SaleError):
-                checkout(user=self.user, **kwargs)
+                checkout(shop=self.shop, user=self.user, **kwargs)
         with self.assertRaises(SaleError):
             self.sell([(self.coca, 1)], method='bitcoin')
         self.assertFalse(Order.objects.exists())
@@ -321,25 +319,26 @@ class PaymentAndCancelTests(SaleTestCase):
 
 class StockServiceTests(SaleTestCase):
     def test_restock_creates_expense_and_entry(self):
-        mv = restock(self.riz.pk, 20, '20500', user=self.manager, fournisseur='Grossiste')
+        mv = restock(self.riz.pk, 20, '20500', shop=self.shop, user=self.manager, fournisseur='Grossiste')
         self.assertEqual(self.qty(self.riz), 30)
         self.assertEqual((mv.stock_avant, mv.stock_apres, mv.cout_total), (10, 30, D('410000')))
         depense = Depense.objects.get()
+        self.assertEqual((depense.account, depense.shop), (self.account, self.shop))
         self.assertEqual(depense.montant, D('410000'))
         self.assertEqual(depense.type_depense.nom, 'Approvisionnement')
         self.riz.refresh_from_db()
         self.assertEqual(self.riz.prix_achat, D('20500'))
 
     def test_adjust_set_and_remove(self):
-        adjust_stock(self.savon.pk, 'set', 12, user=self.manager)
+        adjust_stock(self.savon.pk, 'set', 12, shop=self.shop, user=self.manager)
         self.assertEqual(self.qty(self.savon), 12)
-        mv = adjust_stock(self.savon.pk, 'remove', 2, user=self.manager)
+        mv = adjust_stock(self.savon.pk, 'remove', 2, shop=self.shop, user=self.manager)
         self.assertEqual((mv.type_mouvement, mv.stock_avant, mv.stock_apres), (TypeMouvement.SORTIE_PERTE, 12, 10))
-        self.assertIsNone(adjust_stock(self.savon.pk, 'set', 10, user=self.manager))
+        self.assertIsNone(adjust_stock(self.savon.pk, 'set', 10, shop=self.shop, user=self.manager))
 
     def test_cannot_go_negative(self):
         with self.assertRaises(StockError):
-            adjust_stock(self.riz.pk, 'remove', 11, user=self.manager)
+            adjust_stock(self.riz.pk, 'remove', 11, shop=self.shop, user=self.manager)
         self.assertEqual(self.qty(self.riz), 10)
 
     def test_sale_cost_snapshot(self):
@@ -358,7 +357,7 @@ class DatabaseConstraintTests(SaleTestCase):
 
     def test_negative_stock_rejected_by_database(self):
         with self.assertRaises(IntegrityError), transaction.atomic():
-            Product.objects.filter(pk=self.coca.pk).update(qty=-1)
+            Stock.objects.filter(shop=self.shop, product=self.coca).update(qty=-1)
 
 
 class ApiTests(SaleTestCase):
@@ -370,8 +369,8 @@ class ApiTests(SaleTestCase):
         self.assertEqual(self.post_json(reverse('api_checkout'), {}).status_code, 401)
 
     def test_my_day_for_employee(self):
-        other = User.objects.create_user('autre', password='motdepasse123', role='employee')
-        checkout(lines=[{'product_id': self.savon.pk, 'qty': 1}], user=other, method='cash')   # pas à lui
+        other = make_employee(self.shop, 'autre')
+        checkout(shop=self.shop, lines=[{'product_id': self.savon.pk, 'qty': 1}], user=other, method='cash')   # pas à lui
         self.sell([(self.coca, 1)])                                                           # 2000 encaissés
         self.client.force_login(self.user)
         self.assertEqual(self.client.get(reverse('pos')).context['my_day'], {'count': 1, 'collected': D('2000')})
@@ -465,10 +464,12 @@ class DashboardTests(SaleTestCase):
         Payment.objects.filter(order=old).update(date=yesterday)
         self.sell([(self.coca, 2)])                                   # 4000, coût 3000, payé
         self.sell([(self.riz, 1)], method='credit', amount='5000', client_id=self.client_.pk)   # 25000, coût 21000
-        loyer = TypeDepense.objects.create(nom='Loyer')
-        Depense.objects.create(type_depense=loyer, description='Loyer', montant=D('1000'))
-        appro, _ = TypeDepense.objects.get_or_create(nom='Approvisionnement')
-        Depense.objects.create(type_depense=appro, description='Achat', montant=D('50000'))
+        loyer = TypeDepense.objects.create(account=self.account, nom='Loyer')
+        Depense.objects.create(account=self.account, shop=self.shop, type_depense=loyer, description='Loyer',
+                               montant=D('1000'))
+        appro, _ = TypeDepense.objects.get_or_create(account=self.account, nom='Approvisionnement')
+        Depense.objects.create(account=self.account, shop=self.shop, type_depense=appro, description='Achat',
+                               montant=D('50000'))
 
         self.client.force_login(self.manager)
         ctx = self.client.get(reverse('dashboard')).context
@@ -514,8 +515,9 @@ class ConcurrencyTests(TransactionTestCase):
     """Deux caisses vendent en même temps : le verrou empêche toute survente."""
 
     def setUp(self):
-        self.user = User.objects.create_user('caisse', password='x' * 10, role='employee')
-        self.client_ = Client.objects.create(name='Mamadou', phone='622000001')
+        self.account, (self.shop,), _ = make_account()
+        self.user = make_employee(self.shop, 'caisse')
+        self.client_ = Client.objects.create(shop=self.shop, name='Mamadou', phone='622000001')
 
     def race(self, target, n=2):
         barrier = threading.Barrier(n)
@@ -537,33 +539,31 @@ class ConcurrencyTests(TransactionTestCase):
         return results
 
     def test_last_item_sold_only_once(self):
-        product = Product.objects.create(title='Dernier riz', value=D('25000'))
-        adjust_stock(product.pk, 'add', 1)
-        results = self.race(lambda i: checkout(lines=[{'product_id': product.pk, 'qty': 1}],
+        product = Product.objects.create(account=self.account, title='Dernier riz', value=D('25000'))
+        adjust_stock(product.pk, 'add', 1, shop=self.shop)
+        results = self.race(lambda i: checkout(shop=self.shop, lines=[{'product_id': product.pk, 'qty': 1}],
                                                user=self.user, method='cash'))
         self.assertEqual(sorted(kind for kind, _ in results), ['err', 'ok'])
         error = next(value for kind, value in results if kind == 'err')
         self.assertIsInstance(error, SaleError)
-        product.refresh_from_db()
-        self.assertEqual(product.qty, 0)
+        self.assertEqual(stock_qty(self.shop, product), 0)
         self.assertEqual(Order.objects.count(), 1)
         self.assertEqual(MouvementStock.objects.filter(type_mouvement=TypeMouvement.SORTIE_VENTE).count(), 1)
 
     def test_same_sale_sent_twice_at_once_is_recorded_once(self):
-        product = Product.objects.create(title='Savon', value=D('3000'))
-        adjust_stock(product.pk, 'add', 10)
+        product = Product.objects.create(account=self.account, title='Savon', value=D('3000'))
+        adjust_stock(product.pk, 'add', 10, shop=self.shop)
         key = str(uuid.uuid4())
-        results = self.race(lambda i: checkout(lines=[{'product_id': product.pk, 'qty': 2}],
+        results = self.race(lambda i: checkout(shop=self.shop, lines=[{'product_id': product.pk, 'qty': 2}],
                                                user=self.user, method='cash', sale_key=key))
         self.assertTrue(all(kind == 'ok' for kind, _ in results), results)
         self.assertEqual(Order.objects.count(), 1)
-        product.refresh_from_db()
-        self.assertEqual(product.qty, 8)
+        self.assertEqual(stock_qty(self.shop, product), 8)
 
     def test_concurrent_debt_payments_never_exceed_total(self):
-        product = Product.objects.create(title='Huile', value=D('12000'))
-        adjust_stock(product.pk, 'add', 5)
-        order = checkout(lines=[{'product_id': product.pk, 'qty': 1}], user=self.user, method='credit',
+        product = Product.objects.create(account=self.account, title='Huile', value=D('12000'))
+        adjust_stock(product.pk, 'add', 5, shop=self.shop)
+        order = checkout(shop=self.shop, lines=[{'product_id': product.pk, 'qty': 1}], user=self.user, method='credit',
                          client_id=self.client_.pk).order
         results = self.race(lambda i: services.add_payment(order.pk, '12000', 'cash', user=self.user))
         self.assertEqual(sorted(kind for kind, _ in results), ['err', 'ok'])

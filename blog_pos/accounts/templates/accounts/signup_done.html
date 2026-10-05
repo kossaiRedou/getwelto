@@ -1,0 +1,12 @@
+{% extends 'base_auth.html' %}
+{% load welto %}
+{% block title %}Inscription reçue{% endblock %}
+{% block content %}
+<div class="text-center">
+  <span class="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-full bg-emerald-50 text-emerald-600">{% icon 'check' 'h-7 w-7' %}</span>
+  <h1 class="text-2xl font-bold tracking-tight">Merci{% if name %} {{ name }}{% endif %} !</h1>
+  <p class="mt-2 text-sm text-slate-600">Votre inscription est bien reçue. Notre équipe vous contacte très vite au numéro indiqué pour activer votre compte.</p>
+  {% if saas_contact %}<p class="mt-3 text-sm text-slate-600">Pressé ? Écrivez-nous : <b>{{ saas_contact }}</b></p>{% endif %}
+  <a href="{% url 'users:login' %}" class="btn btn-light mt-6 w-full">Retour à la connexion</a>
+</div>
+{% endblock %}

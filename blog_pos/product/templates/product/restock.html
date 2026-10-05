@@ -3,7 +3,8 @@
 {% block title %}Approvisionnement{% endblock %}
 {% block body_class %}bg-navy-950 overscroll-none{% endblock %}
 {% block topbar_class %}bg-navy-900 text-white{% endblock %}
-{% block topbar_title %}Approvisionnement{% endblock %}
+{% block topbar_title %}Approvisionnement{% if scope.multi_shop %} · {{ scope.shop.name }}{% endif %}{% endblock %}
+{% block expiry %}{% endblock %}
 {% block topbar_actions %}<span id="net-status" class="hidden rounded-full bg-rose-600 px-2 py-0.5 text-xs font-semibold text-white">Hors ligne</span>{% endblock %}
 {% block main_class %}flex min-h-0 flex-1 flex-col{% endblock %}
 
@@ -14,6 +15,7 @@
      data-login-url="{% url 'users:login' %}"
      data-zxing-url="{% static 'vendor/zxing-0.21.3.min.js' %}"
      data-currency="{{ currency }}"
+     data-store="{{ scope.store_key }}"
      data-can-price="{% if request.user|manager %}1{% else %}0{% endif %}">
 
   {# ------------------------------------------------ Recherche / produits #}

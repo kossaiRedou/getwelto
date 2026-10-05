@@ -31,11 +31,12 @@
 <div class="card overflow-hidden">
   <div class="overflow-x-auto">
     <table class="table">
-      <thead><tr><th>N°</th><th>Date</th><th>Client</th><th class="text-right">Total</th><th class="text-right">Reste</th><th>Statut</th></tr></thead>
+      <thead><tr><th>N°</th>{% if scope.all_shops %}<th>Boutique</th>{% endif %}<th>Date</th><th>Client</th><th class="text-right">Total</th><th class="text-right">Reste</th><th>Statut</th></tr></thead>
       <tbody>
       {% for o in page_obj %}
         <tr class="cursor-pointer" onclick="location.href='{{ o.get_absolute_url }}'">
           <td><a href="{{ o.get_absolute_url }}" class="font-semibold text-navy-800 hover:underline">{{ o.title }}</a></td>
+          {% if scope.all_shops %}<td class="text-slate-600">{{ o.shop.name }}</td>{% endif %}
           <td class="num text-slate-600">{{ o.timestamp|date:"d/m/y H:i" }}</td>
           <td class="max-w-48 truncate">{{ o.client.name|default:"—" }}</td>
           <td class="num text-right font-semibold">{{ o.final_value|money }}</td>
@@ -43,7 +44,7 @@
           <td>{% if o.is_paid %}<span class="badge badge-green">Payée</span>{% elif o.amount_paid %}<span class="badge badge-amber">Partiel</span>{% else %}<span class="badge badge-red">Crédit</span>{% endif %}</td>
         </tr>
       {% empty %}
-        <tr><td colspan="6" class="py-10 text-center text-slate-500">Aucune vente.</td></tr>
+        <tr><td colspan="7" class="py-10 text-center text-slate-500">Aucune vente.</td></tr>
       {% endfor %}
       </tbody>
     </table>

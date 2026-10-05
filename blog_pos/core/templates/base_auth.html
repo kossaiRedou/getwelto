@@ -19,7 +19,9 @@
       {% include 'partials/messages.html' %}
       {% block content %}{% endblock %}
     </div>
-    {% block below %}{% endblock %}
+    {% block below %}{% if request.resolver_match.url_name == 'login' %}
+    <p class="mt-6 text-center text-sm text-slate-400">Pas encore de compte ? <a href="{% url 'accounts:signup' %}" class="font-semibold text-white hover:underline">Créer un compte</a></p>
+    {% endif %}{% endblock %}
     <p class="mt-8 text-center text-xs text-slate-500">WELTO · caisse et gestion de boutique</p>
   </main>
 </body>

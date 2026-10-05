@@ -11,6 +11,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_GET, require_POST
 
+from accounts.decorators import shop_required
 from core.decorators import api_login_required, manager_required
 from core.utils import parse_iso_date, to_cents
 from order.models import Order, OrderItem
@@ -29,8 +30,9 @@ def _client_json(client, debt=None):
 
 @require_GET
 @api_login_required
+@shop_required
 def api_search(request):
-    clients = Client.search(request.GET.get('q', ''), limit=8)
+    clients = Client.search(request.scope.clients(), request.GET.get('q', ''), limit=8)
     debts = dict(Order.objects.filter(client__in=clients, is_paid=False).values('client')
                  .annotate(d=Sum(F('final_value') - F('amount_paid'))).values_list('client', 'd'))
     return JsonResponse({'clients': [_client_json(c, debts.get(c.pk, ZERO)) for c in clients]})
@@ -38,22 +40,25 @@ def api_search(request):
 
 @require_POST
 @api_login_required
+@shop_required
 def api_create(request):
+    shop = request.scope.shop
     try:
         data = json.loads(request.body or b'{}')
         name = clean_name_value(data.get('name'))
-        phone = clean_phone_value(data.get('phone'))
+        phone = clean_phone_value(data.get('phone'), shop)
     except ValueError:
         return JsonResponse({'ok': False, 'error': 'Requête invalide.'}, status=400)
     except forms.ValidationError as exc:
         return JsonResponse({'ok': False, 'error': ' '.join(exc.messages)}, status=400)
-    client = Client.objects.create(name=name, phone=phone)
+    client = Client.objects.create(shop=shop, name=name, phone=phone)
     return JsonResponse({'ok': True, 'client': _client_json(client, ZERO)})
 
 
 @login_required
 def client_list(request):
-    clients = Client.objects.annotate(
+    scope = request.scope
+    clients = scope.clients().select_related('shop').annotate(
         n_orders=Count('orders'),
         debt=Coalesce(Sum(F('orders__final_value') - F('orders__amount_paid'),
                           filter=Q(orders__is_paid=False)), ZERO),
@@ -67,7 +72,7 @@ def client_list(request):
     elif status == 'inactive':
         clients = clients.filter(is_active=False)
     page = Paginator(clients.order_by('name'), 30).get_page(request.GET.get('page'))
-    total_debt = (Order.objects.filter(is_paid=False, client__isnull=False)
+    total_debt = (scope.orders().filter(is_paid=False, client__isnull=False)
                   .aggregate(s=Sum(F('final_value') - F('amount_paid')))['s'] or ZERO)
     return render(request, 'client/client_list.html', {
         'page_obj': page, 'q': q, 'status': status, 'total_debt': total_debt,
@@ -75,8 +80,9 @@ def client_list(request):
 
 
 @login_required
+@shop_required
 def client_create(request):
-    form = ClientForm(request.POST or None, initial={'is_active': True})
+    form = ClientForm(request.POST or None, initial={'is_active': True}, shop=request.scope.shop)
     if request.method == 'POST' and form.is_valid():
         client = form.save()
         messages.success(request, f'Client « {client.name} » créé.')
@@ -86,8 +92,8 @@ def client_create(request):
 
 @login_required
 def client_edit(request, pk):
-    client = get_object_or_404(Client, pk=pk)
-    form = ClientForm(request.POST or None, instance=client)
+    client = get_object_or_404(request.scope.reachable_clients(), pk=pk)
+    form = ClientForm(request.POST or None, instance=client, shop=client.shop)
     if request.method == 'POST' and form.is_valid():
         form.save()
         messages.success(request, f'Client « {client.name} » modifié.')
@@ -98,7 +104,7 @@ def client_edit(request, pk):
 
 @manager_required
 def client_delete(request, pk):
-    client = get_object_or_404(Client, pk=pk)
+    client = get_object_or_404(request.scope.reachable_clients(), pk=pk)
     if client.orders.exists():
         messages.error(request, f'« {client.name} » a des ventes enregistrées : désactivez-le plutôt.')
         return redirect('client:client_detail', pk=pk)
@@ -115,7 +121,7 @@ def client_delete(request, pk):
 
 @login_required
 def client_detail(request, pk):
-    client = get_object_or_404(Client, pk=pk)
+    client = get_object_or_404(request.scope.reachable_clients().select_related('shop'), pk=pk)
     orders = client.orders.all()
     start = parse_iso_date(request.GET.get('start'))
     end = parse_iso_date(request.GET.get('end'))

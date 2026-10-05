@@ -21,7 +21,7 @@ from django.db.models import Sum
 from aprovision.models import TypeMouvement
 from aprovision.services import StockError, move_stock
 from client.models import Client
-from product.models import Product
+from product.models import Product, Stock
 from .models import Order, OrderItem, Payment, PaymentMethod
 
 ZERO = Decimal('0.00')
@@ -123,9 +123,11 @@ def _sync_paid(order):
     Order.objects.filter(pk=order.pk).update(amount_paid=order.amount_paid, is_paid=order.is_paid)
 
 
-def checkout(*, lines, user, method, amount=None, discount=None, client_id=None,
+def checkout(*, lines, user, shop, method, amount=None, discount=None, client_id=None,
              expected_total=None, sale_key=None):
-    """Enregistre une vente complète. Retourne un SaleResult (vente + monnaie à rendre).
+    """Enregistre une vente dans une boutique. Retourne un SaleResult (vente + monnaie à rendre).
+
+    Les produits viennent du catalogue du compte, le stock et le client de la boutique.
 
     Une ligne peut porter un `price` : prix unitaire négocié pour CETTE vente
     uniquement (prix client). La fiche produit n'est jamais modifiée.
@@ -143,28 +145,30 @@ def checkout(*, lines, user, method, amount=None, discount=None, client_id=None,
     key = _parse_key(sale_key)
 
     if key:
-        existing = Order.objects.filter(sync_uuid=key).first()
+        existing = Order.objects.filter(sync_uuid=key, shop=shop).first()
         if existing:
             return SaleResult(order=existing, replayed=True)
 
     client = None
     if client_id not in (None, ''):
-        client = Client.objects.filter(pk=client_id, is_active=True).first()
+        client = Client.objects.filter(pk=client_id, shop=shop, is_active=True).first()
         if client is None:
             raise SaleError('Client introuvable ou désactivé.')
 
     try:
         with transaction.atomic():
             products = {p.pk: p for p in
-                        Product.objects.select_for_update().filter(pk__in=merged).order_by('pk')}
+                        Product.objects.select_for_update().filter(pk__in=merged, account_id=shop.account_id)
+                        .order_by('pk')}
             missing = [pid for pid in merged if pid not in products or not products[pid].active]
             if missing:
                 raise SaleError('Un produit du panier n\'est plus disponible. Rechargez la caisse.',
                                 code='price_changed')
+            stock = dict(Stock.objects.filter(shop=shop, product_id__in=merged).values_list('product_id', 'qty'))
             shortages = [
                 {'product_id': pid, 'title': products[pid].title,
-                 'available': products[pid].qty, 'requested': qty}
-                for pid, qty in merged.items() if products[pid].qty < qty
+                 'available': stock.get(pid, 0), 'requested': qty}
+                for pid, qty in merged.items() if stock.get(pid, 0) < qty
             ]
             if shortages:
                 detail = ', '.join(f"{s['title']} ({s['available']} en stock)" for s in shortages)
@@ -193,7 +197,7 @@ def checkout(*, lines, user, method, amount=None, discount=None, client_id=None,
                 raise SaleError('Choisissez un client : le reste à payer sera inscrit à son crédit.',
                                 code='client_required', data={'remaining': str(total - paid)})
 
-            order = Order(value=subtotal, discount=discount, final_value=total,
+            order = Order(shop=shop, value=subtotal, discount=discount, final_value=total,
                           amount_paid=ZERO, is_paid=total == ZERO, client=client, created_by=user)
             if key:
                 order.sync_uuid = key
@@ -207,7 +211,7 @@ def checkout(*, lines, user, method, amount=None, discount=None, client_id=None,
                     final_price=unit[pid], total_price=unit[pid] * qty,
                     cost_price=product.prix_achat,
                 )
-                move_stock(pid, -qty, TypeMouvement.SORTIE_VENTE, user=user, order=order,
+                move_stock(pid, -qty, TypeMouvement.SORTIE_VENTE, shop=shop, user=user, order=order,
                            unit_cost=product.prix_achat if product.prix_achat > 0 else None,
                            description=f'Vente {order.title}')
 
@@ -218,7 +222,7 @@ def checkout(*, lines, user, method, amount=None, discount=None, client_id=None,
         raise SaleError(str(exc), code='stock')
     except IntegrityError:
         if key:
-            existing = Order.objects.filter(sync_uuid=key).first()
+            existing = Order.objects.filter(sync_uuid=key, shop=shop).first()
             if existing:
                 return SaleResult(order=existing, replayed=True)
         raise
@@ -263,7 +267,7 @@ def cancel_sale(order_id, *, user):
         order = Order.objects.select_for_update().get(pk=order_id)
         title = order.title
         for item in order.order_items.order_by('product_id'):
-            move_stock(item.product_id, item.qty, TypeMouvement.AJUSTEMENT_PLUS, user=user,
+            move_stock(item.product_id, item.qty, TypeMouvement.AJUSTEMENT_PLUS, shop=order.shop, user=user,
                        description=f'Annulation vente {title}')
         order.delete()
     return title

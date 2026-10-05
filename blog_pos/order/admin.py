@@ -40,9 +40,10 @@ class PaymentInline(admin.TabularInline):
 
 @admin.register(Order)
 class OrderAdmin(ReadOnlyAdmin):
-    list_display = ('title', 'date', 'client', 'final_value', 'amount_paid', 'is_paid', 'created_by')
-    list_filter = ('is_paid', 'date')
-    search_fields = ('title', 'client__name', 'client__phone')
+    list_display = ('title', 'shop', 'date', 'client', 'final_value', 'amount_paid', 'is_paid', 'created_by')
+    list_filter = ('is_paid', 'shop__account', 'date')
+    search_fields = ('title', 'client__name', 'client__phone', 'shop__name', 'shop__account__name')
+    list_select_related = ('shop', 'client', 'created_by')
     date_hierarchy = 'date'
     inlines = [OrderItemInline, PaymentInline]
 

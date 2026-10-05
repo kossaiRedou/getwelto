@@ -26,9 +26,20 @@ class DepenseForm(StyledFormMixin, forms.ModelForm):
             'date_depense': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
         }
 
-    def __init__(self, *args, **kwargs):
+    COMMON = 'common'
+
+    def __init__(self, *args, scope, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['type_depense'].queryset = TypeDepense.objects.filter(actif=True).exclude(nom='Approvisionnement')
+        self.scope = scope
+        self.fields['type_depense'].queryset = scope.expense_types().filter(actif=True).exclude(nom='Approvisionnement')
+        if scope.multi_shop:
+            # Boutique concernée, ou dépense commune (salaire du gérant, transport…).
+            self.fields['where'] = forms.ChoiceField(
+                label='Boutique', initial=scope.shop.pk if scope.shop else self.COMMON,
+                choices=[(s.pk, s.name) for s in scope.shops] + [(self.COMMON, 'Commune à toutes les boutiques')],
+                help_text='Une dépense commune compte seulement dans la vue « Toutes les boutiques ».')
+            self.fields['where'].widget.attrs['class'] = 'input'
+            self.order_fields(['type_depense', 'new_type', 'where'])
         self.fields['type_depense'].required = False
         self.fields['type_depense'].empty_label = '— Choisir —'
         self.fields['fournisseur'].required = False
@@ -45,11 +56,17 @@ class DepenseForm(StyledFormMixin, forms.ModelForm):
         new_type = ' '.join((data.get('new_type') or '').split())
         if new_type:
             data['type_depense'], _ = TypeDepense.objects.get_or_create(
-                nom__iexact=new_type, defaults={'nom': new_type})
+                account=self.scope.account, nom__iexact=new_type, defaults={'nom': new_type})
         elif not data.get('type_depense'):
             self.add_error('type_depense', 'Choisissez un type ou saisissez-en un nouveau.')
         return data
 
     def save(self, commit=True):
         self.instance.type_depense = self.cleaned_data['type_depense']
+        self.instance.account = self.scope.account
+        if self.scope.multi_shop:
+            where = self.cleaned_data.get('where')
+            self.instance.shop = None if where == self.COMMON else self.scope.get_shop(where)
+        else:
+            self.instance.shop = self.scope.shop or (self.scope.shops[0] if self.scope.shops else None)
         return super().save(commit)

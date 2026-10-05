@@ -21,8 +21,9 @@
     login: root.dataset.loginUrl
   };
   var FINE_POINTER = window.WeltoKit.finePointer;
-  var STORE_CATALOG = 'welto.catalog.v1';
-  var STORE_CART = 'welto.cart.v1';
+  // Un tiroir par compte et par boutique : le panier d'une boutique ne passe jamais dans une autre.
+  var STORE_CATALOG = 'welto.catalog.v2.' + root.dataset.store;
+  var STORE_CART = 'welto.cart.v2.' + root.dataset.store;
 
   var $ = function (id) { return document.getElementById(id); };
   var el = {

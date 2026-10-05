@@ -5,7 +5,6 @@ from decimal import Decimal
 
 from django.db.models import Count, F, Sum
 
-from aprovision.models import Depense
 from .models import Order, OrderItem, Payment
 
 ZERO = Decimal('0.00')
@@ -50,14 +49,17 @@ def previous_period(start, end):
     return prev_end - (end - start), prev_end
 
 
-def period_figures(start, end):
-    """CA, marge, dépenses et bénéfice d'une période (dates incluses)."""
-    orders = Order.objects.filter(date__gte=start, date__lte=end)
+def period_figures(scope, start, end):
+    """CA, marge, dépenses et bénéfice d'une période (dates incluses), dans le périmètre du scope.
+
+    En vue d'ensemble, les dépenses communes comptent ; pour une boutique, seulement les siennes.
+    """
+    orders = scope.orders().filter(date__gte=start, date__lte=end)
     sales = sales_summary(orders)
     items = OrderItem.objects.filter(order__in=orders)
     agg = items.aggregate(units=Sum('qty'), cost=Sum(F('qty') * F('cost_price')))
     cogs = agg['cost'] or ZERO
-    expenses = Depense.objects.filter(date_depense__gte=start, date_depense__lte=end)
+    expenses = scope.expenses().filter(date_depense__gte=start, date_depense__lte=end)
     other = expenses.exclude(type_depense__nom=APPRO)
     other_total = other.aggregate(s=Sum('montant'))['s'] or ZERO
     margin = sales['total'] - cogs
@@ -66,6 +68,30 @@ def period_figures(start, end):
         'sales': sales, 'units': agg['units'] or 0, 'cogs': cogs, 'margin': margin,
         'other_total': other_total, 'net': margin - other_total,
     }
+
+
+def shop_breakdown(scope, start, end):
+    """Comparaison des boutiques sur la période : ventes, CA, marge, encaissé, crédits en cours."""
+    orders = scope.orders().filter(date__gte=start, date__lte=end)
+    sales = {r['shop']: r for r in orders.values('shop').annotate(
+        n=Count('id'), total=Sum('final_value'), paid=Sum('amount_paid'))}
+    cost = dict(OrderItem.objects.filter(order__in=orders).values('order__shop')
+                .annotate(c=Sum(F('qty') * F('cost_price'))).values_list('order__shop', 'c'))
+    collected = dict(scope.payments().filter(date__gte=start, date__lte=end).values('order__shop')
+                     .annotate(s=Sum('amount')).values_list('order__shop', 's'))
+    unpaid = dict(scope.orders().filter(is_paid=False).values('shop')
+                  .annotate(d=Sum(F('final_value') - F('amount_paid'))).values_list('shop', 'd'))
+    rows = []
+    for shop in scope.shops:
+        row = sales.get(shop.pk, {})
+        total = row.get('total') or ZERO
+        rows.append({'shop': shop, 'count': row.get('n') or 0, 'total': total,
+                     'margin': total - (cost.get(shop.pk) or ZERO),
+                     'collected': collected.get(shop.pk) or ZERO, 'unpaid': unpaid.get(shop.pk) or ZERO})
+    peak = max((r['total'] for r in rows), default=ZERO)
+    for r in rows:
+        r['pct'] = int(r['total'] * 100 / peak) if peak > 0 else 0
+    return sorted(rows, key=lambda r: -r['total'])
 
 
 def user_day(user, day):

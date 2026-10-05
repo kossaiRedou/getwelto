@@ -4,12 +4,13 @@ from core.forms import StyledFormMixin
 from .models import Client, normalize_phone
 
 
-def clean_phone_value(raw, instance_pk=None):
+def clean_phone_value(raw, shop, instance_pk=None):
+    """Téléphone normalisé, unique parmi les clients de la boutique."""
     phone = normalize_phone(raw)
     digits = phone.lstrip('+')
     if not 7 <= len(digits) <= 15:
         raise forms.ValidationError('Numéro invalide : 7 à 15 chiffres.')
-    existing = Client.objects.filter(phone=phone)
+    existing = Client.objects.filter(shop=shop, phone=phone)
     if instance_pk:
         existing = existing.exclude(pk=instance_pk)
     if existing.exists():
@@ -34,8 +35,14 @@ class ClientForm(StyledFormMixin, forms.ModelForm):
             'phone': forms.TextInput(attrs={'placeholder': 'Ex : 622 12 34 56', 'inputmode': 'tel'}),
         }
 
+    def __init__(self, *args, shop, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.shop = shop
+        if not self.instance.pk:
+            self.instance.shop = shop
+
     def clean_phone(self):
-        return clean_phone_value(self.cleaned_data.get('phone'), self.instance.pk)
+        return clean_phone_value(self.cleaned_data.get('phone'), self.shop, self.instance.pk)
 
     def clean_name(self):
         return clean_name_value(self.cleaned_data.get('name'))

@@ -11,7 +11,6 @@ try:
 except Exception:
     AppSetting = None
 from core.mixins import SyncableMixin
-from .managers import ProductManager
 
 
 def get_currency_label():
@@ -63,7 +62,8 @@ def text_on_light(color, amount=0.18):
 
 
 class Category(SyncableMixin):
-    title = models.CharField(max_length=150, unique=True)
+    account = models.ForeignKey('accounts.Account', on_delete=models.CASCADE, related_name='categories')
+    title = models.CharField(max_length=150)
     color = models.CharField(max_length=7, blank=True, validators=[hex_color],
                              help_text="Couleur des produits de la catégorie à la caisse")
     is_default = models.BooleanField(default=False, editable=False,
@@ -73,41 +73,48 @@ class Category(SyncableMixin):
         verbose_name_plural = 'Categories'
         ordering = ['-is_default', 'title']
         constraints = [
-            models.UniqueConstraint(fields=['is_default'], condition=Q(is_default=True),
-                                    name='category_single_default'),
+            models.UniqueConstraint(fields=['account', 'title'], name='category_unique_title_per_account'),
+            models.UniqueConstraint(fields=['account'], condition=Q(is_default=True),
+                                    name='category_single_default_per_account'),
         ]
 
     def __str__(self):
         return self.title
 
     @classmethod
-    def get_default(cls):
-        category = cls.objects.filter(is_default=True).first()
+    def get_default(cls, account):
+        """Catégorie « Autres » du compte (créée au besoin)."""
+        category = cls.objects.filter(account=account, is_default=True).first()
         if category is None:
             category, _ = cls.objects.get_or_create(
-                title=DEFAULT_CATEGORY_TITLE, defaults={'color': DEFAULT_CATEGORY_COLOR})
+                account=account, title=DEFAULT_CATEGORY_TITLE, defaults={'color': DEFAULT_CATEGORY_COLOR})
             if not category.is_default:
                 cls.objects.filter(pk=category.pk).update(is_default=True)
                 category.is_default = True
         return category
 
     @staticmethod
-    def next_color():
-        """Couleur de la palette la moins utilisée par les catégories existantes."""
-        used = list(Category.objects.values_list('color', flat=True))
+    def next_color(account):
+        """Couleur de la palette la moins utilisée par les catégories du compte."""
+        used = list(Category.objects.filter(account=account).values_list('color', flat=True))
         return min((c for c, _ in PALETTE), key=lambda c: (used.count(c), [p for p, _ in PALETTE].index(c)))
 
     def save(self, *args, **kwargs):
         self.color = (self.color or '').lower()
         if not self.color:
-            self.color = DEFAULT_CATEGORY_COLOR if self.is_default else self.next_color()
+            self.color = DEFAULT_CATEGORY_COLOR if self.is_default else self.next_color(self.account)
         super().save(*args, **kwargs)
 
 
 class Product(SyncableMixin):
+    """Produit du catalogue, commun à toutes les boutiques du compte (même prix partout).
+
+    Le stock est propre à chaque boutique : voir `Stock`.
+    """
+    account = models.ForeignKey('accounts.Account', on_delete=models.CASCADE, related_name='products')
     active = models.BooleanField(default=True)
-    title = models.CharField(max_length=150, unique=True)
-    barcode = models.CharField(max_length=64, unique=True, null=True, blank=True,
+    title = models.CharField(max_length=150)
+    barcode = models.CharField(max_length=64, null=True, blank=True,
                                help_text="Code-barres (optionnel, pour la douchette)")
     category = models.ForeignKey(Category, blank=True, on_delete=models.PROTECT,
                                  help_text="« Autres » si aucune catégorie n'est choisie")
@@ -116,16 +123,14 @@ class Product(SyncableMixin):
     value = models.DecimalField(default=Decimal('0.00'), **MONEY)
     discount_value = models.DecimalField(default=Decimal('0.00'), **MONEY)
     final_value = models.DecimalField(default=Decimal('0.00'), **MONEY)
-    qty = models.PositiveIntegerField(default=0)
     prix_achat = models.DecimalField(default=Decimal('0.00'), help_text="Prix d'achat unitaire (pour la traçabilité)", **MONEY)
-
-    objects = models.Manager()
-    browser = ProductManager()
 
     class Meta:
         verbose_name_plural = 'Products'
         ordering = ['title']
         constraints = [
+            models.UniqueConstraint(fields=['account', 'title'], name='product_unique_title_per_account'),
+            models.UniqueConstraint(fields=['account', 'barcode'], name='product_unique_barcode_per_account'),
             models.CheckConstraint(condition=Q(value__gte=0), name='product_value_gte_0'),
             models.CheckConstraint(condition=Q(discount_value__gte=0), name='product_discount_value_gte_0'),
             models.CheckConstraint(condition=Q(final_value__gte=0), name='product_final_value_gte_0'),
@@ -138,7 +143,7 @@ class Product(SyncableMixin):
         self.final_value = self.discount_value if self.discount_value > 0 else self.value
         self.color = (self.color or '').lower()
         if self.category_id is None:
-            self.category = Category.get_default()
+            self.category = Category.get_default(self.account)
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -165,3 +170,22 @@ class Product(SyncableMixin):
             return f'{self.prix_achat} {get_currency_label()}'
         return 'Non défini'
     tag_prix_achat.short_description = 'Prix d\'achat'
+
+
+class Stock(models.Model):
+    """Stock d'un produit dans une boutique. Écrit uniquement par aprovision.services.move_stock."""
+    shop = models.ForeignKey('accounts.Shop', on_delete=models.CASCADE, related_name='stocks')
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='stocks')
+    qty = models.PositiveIntegerField(default=0)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Stock en boutique'
+        verbose_name_plural = 'Stocks en boutique'
+        constraints = [
+            models.UniqueConstraint(fields=['shop', 'product'], name='stock_unique_shop_product'),
+            models.CheckConstraint(condition=Q(qty__gte=0), name='stock_qty_gte_0'),
+        ]
+
+    def __str__(self):
+        return f'{self.product} @ {self.shop} : {self.qty}'

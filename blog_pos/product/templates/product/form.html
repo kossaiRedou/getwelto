@@ -8,7 +8,7 @@
       <a href="{% url 'product:product_list' %}" class="back-link" aria-label="Retour">{% icon 'back' 'h-5 w-5' %}</a>
       <div>
         <h1 class="page-title">{{ title }}</h1>
-        {% if product %}<p class="page-subtitle">Stock actuel : <b class="text-slate-700">{{ product.qty }}</b></p>{% endif %}
+        {% if stock_rows %}<p class="page-subtitle">Stock : {% for shop, qty in stock_rows %}{% if not forloop.first %} · {% endif %}{% if stock_rows|length > 1 %}{{ shop.name }} {% endif %}<b class="text-slate-700">{{ qty }}</b>{% endfor %}</p>{% endif %}
       </div>
     </div>
   </div>

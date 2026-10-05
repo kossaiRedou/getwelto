@@ -8,8 +8,7 @@ from client.models import Client
 from core.utils import format_money
 from order.services import checkout
 from product.models import Category, Product
-from users.middleware import SetupMiddleware
-from users.models import AppSetting, User
+from core.testing import make_account, make_employee, stock_qty
 
 
 class FormatTests(TestCase):
@@ -20,41 +19,20 @@ class FormatTests(TestCase):
         self.assertEqual(format_money(None), '0')
 
 
-class SetupFlowTests(TestCase):
-    def setUp(self):
-        SetupMiddleware.setup_done = False
-
-    def test_first_launch_redirects_to_setup_and_creates_shop(self):
-        self.assertRedirects(self.client.get('/'), reverse('users:setup'))
-        r = self.client.post(reverse('users:setup'), {
-            'company_name': 'Boutique Kaloum', 'currency_label': 'GNF', 'first_name': 'Aliou', 'last_name': 'Diallo',
-            'username': 'aliou', 'email': 'a@example.com', 'phone': '622000000',
-            'password1': 'unmotdepasse-solide', 'password2': 'unmotdepasse-solide',
-        })
-        self.assertRedirects(r, reverse('product:add_product'))
-        user = User.objects.get()
-        self.assertEqual(user.role, 'manager')
-        self.assertEqual(AppSetting.get_solo().company_name, 'Boutique Kaloum')
-        self.assertEqual(AppSetting.get_solo().currency_label, 'GNF')
-        self.assertEqual(self.client.get('/').status_code, 200)
-
-
 class PagesTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.manager = User.objects.create_user('chef', password='x' * 10, role='manager', first_name='Chef')
-        cls.employee = User.objects.create_user('caisse', password='x' * 10, role='employee', first_name='Awa')
-        cls.other = User.objects.create_user('autre', password='x' * 10, role='employee', first_name='Bob')
-        cat = Category.objects.create(title='Boissons')
-        cls.product = Product.objects.create(title='Coca', value=Decimal('2000'), category=cat, barcode='5449000000996')
-        restock(cls.product.pk, 20, '1500', user=cls.manager)
-        adjust_stock(cls.product.pk, 'remove', 1, user=cls.manager)
-        cls.customer = Client.objects.create(name='Mariama', phone='622111222')
-        cls.order = checkout(lines=[{'product_id': cls.product.pk, 'qty': 3}], user=cls.employee, method='credit',
-                             amount='1000', client_id=cls.customer.pk).order
-
-    def setUp(self):
-        SetupMiddleware.setup_done = False
+        cls.account, (cls.shop,), cls.manager = make_account(max_shops=2)
+        cls.employee = make_employee(cls.shop, 'caisse', first_name='Awa')
+        cls.other = make_employee(cls.shop, 'autre', first_name='Bob')
+        cat = Category.objects.create(account=cls.account, title='Boissons')
+        cls.product = Product.objects.create(account=cls.account, title='Coca', value=Decimal('2000'), category=cat,
+                                             barcode='5449000000996')
+        restock(cls.product.pk, 20, '1500', shop=cls.shop, user=cls.manager)
+        adjust_stock(cls.product.pk, 'remove', 1, shop=cls.shop, user=cls.manager)
+        cls.customer = Client.objects.create(shop=cls.shop, name='Mariama', phone='622111222')
+        cls.order = checkout(lines=[{'product_id': cls.product.pk, 'qty': 3}], user=cls.employee, shop=cls.shop,
+                             method='credit', amount='1000', client_id=cls.customer.pk).order
 
     def pages(self):
         o, p, c = self.order.pk, self.product.pk, self.customer.pk
@@ -74,7 +52,8 @@ class PagesTests(TestCase):
                         reverse('users:user_list'), reverse('users:user_create'),
                         reverse('users:user_update', args=[self.other.pk]),
                         reverse('users:change_password', args=[self.other.pk]),
-                        reverse('users:app_settings')],
+                        reverse('users:app_settings'), reverse('accounts:shop_list'),
+                        reverse('accounts:shop_create'), reverse('accounts:shop_edit', args=[self.shop.pk])],
         }
 
     def test_manager_sees_everything(self):
@@ -119,8 +98,7 @@ class PagesTests(TestCase):
         self.client.force_login(self.manager)
         r = self.client.post(reverse('order_cancel', args=[self.order.pk]))
         self.assertRedirects(r, reverse('order_list'))
-        self.product.refresh_from_db()
-        self.assertEqual(self.product.qty, 19)
+        self.assertEqual(stock_qty(self.shop, self.product), 19)
 
     def test_product_form_with_initial_stock(self):
         self.client.force_login(self.manager)
@@ -129,7 +107,7 @@ class PagesTests(TestCase):
             'initial_qty': '12', 'active': 'on', 'barcode': ''})
         self.assertRedirects(r, reverse('product:product_list'))
         riz = Product.objects.get(title='Riz 5kg')
-        self.assertEqual((riz.qty, riz.barcode), (12, None))
+        self.assertEqual((stock_qty(self.shop, riz), riz.barcode, riz.account), (12, None, self.account))
 
     def test_stock_restock_form(self):
         self.client.force_login(self.manager)
@@ -137,7 +115,7 @@ class PagesTests(TestCase):
                              {'action': 'restock', 'quantity': '10', 'unit_cost': '1600'})
         self.assertRedirects(r, reverse('product:product_list'))
         self.product.refresh_from_db()
-        self.assertEqual((self.product.qty, self.product.prix_achat), (26, Decimal('1600')))
+        self.assertEqual((stock_qty(self.shop, self.product), self.product.prix_achat), (26, Decimal('1600')))
 
     def test_sold_product_cannot_be_deleted(self):
         self.client.force_login(self.manager)
@@ -159,12 +137,14 @@ class PagesTests(TestCase):
 class LoginThrottleTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.user = User.objects.create_user('awa', password='bon-mot-de-passe', role='employee', first_name='Awa')
+        _, (shop,), _ = make_account()
+        cls.user = make_employee(shop, 'awa', first_name='Awa')
+        cls.user.set_password('bon-mot-de-passe')
+        cls.user.save()
 
     def setUp(self):
         from django.core.cache import cache
         cache.clear()
-        SetupMiddleware.setup_done = False
 
     def login(self, password, username='awa'):
         return self.client.post(reverse('users:login'), {'username': username, 'password': password})

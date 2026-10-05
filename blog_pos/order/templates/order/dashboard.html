@@ -8,7 +8,7 @@
 <div class="mb-5 flex flex-wrap items-end justify-between gap-3">
   <div>
     <p class="text-sm font-medium text-slate-500 first-letter:uppercase">{% if single_day %}{{ start|date:"l j F Y" }}{% else %}Du {{ start|date:"j F Y" }} au {{ end|date:"j F Y" }}{% endif %}</p>
-    <h1 class="mt-0.5 text-2xl font-bold tracking-tight text-slate-900">Tableau de bord</h1>
+    <h1 class="mt-0.5 text-2xl font-bold tracking-tight text-slate-900">Tableau de bord{% if scope.multi_shop %} <span class="text-slate-400">·</span> <span class="text-[#0e6dfa]">{% if scope.all_shops %}Toutes les boutiques{% else %}{{ scope.shop.name }}{% endif %}</span>{% endif %}</h1>
   </div>
   <a href="{% url 'pos' %}" class="inline-flex h-10 items-center gap-2 rounded-xl bg-[#0e6dfa] px-4 text-sm font-semibold text-white shadow-[0_8px_18px_-8px_rgba(14,109,250,.8)] transition hover:bg-[#0a52c6]">
     {% icon 'cart' 'h-4 w-4' %} Ouvrir la caisse
@@ -109,6 +109,52 @@
     <p class="mt-2.5 text-xs text-slate-500">Unités sorties par les ventes</p>
   </div>
 </div>
+
+{% if by_shop %}
+{# ---------- Vue d'ensemble : comparaison des boutiques ---------- #}
+<section class="d-card mb-6 overflow-hidden">
+  <div class="flex items-center justify-between gap-3 px-5 pt-5">
+    <h2 class="d-title">Par boutique</h2>
+    <span class="text-xs text-slate-500">sur la période · crédits : en cours</span>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="mt-3 w-full text-left text-sm">
+      <thead>
+        <tr class="border-y border-[#0e6dfa]/15 bg-[#0e6dfa]/[0.06] text-xs font-semibold text-slate-500">
+          <th class="px-5 py-2.5">Boutique</th>
+          <th class="px-3 py-2.5 text-right">Ventes</th>
+          <th class="px-3 py-2.5 text-right">Chiffre d'affaires</th>
+          <th class="px-3 py-2.5 text-right">Marge</th>
+          <th class="px-3 py-2.5 text-right">Encaissé</th>
+          <th class="px-3 py-2.5 text-right">Crédits</th>
+          <th class="px-5 py-2.5"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        {% for r in by_shop %}
+        <tr class="transition hover:bg-[#0e6dfa]/[0.03]">
+          <td class="px-5 py-3">
+            <span class="font-semibold text-slate-900">{{ r.shop.name }}</span>
+            <span class="mt-1.5 block h-1.5 w-full max-w-48 overflow-hidden rounded-full bg-[#0e6dfa]/10"><span class="block h-full rounded-full bg-[#0e6dfa]" style="width: {{ r.pct }}%"></span></span>
+          </td>
+          <td class="px-3 py-3 text-right tabular-nums text-slate-600">{{ r.count }}</td>
+          <td class="px-3 py-3 text-right font-bold tabular-nums whitespace-nowrap text-slate-900">{{ r.total|money }}</td>
+          <td class="px-3 py-3 text-right font-semibold tabular-nums whitespace-nowrap text-[#1b8650]">{{ r.margin|money }}</td>
+          <td class="px-3 py-3 text-right tabular-nums whitespace-nowrap text-slate-700">{{ r.collected|money }}</td>
+          <td class="px-3 py-3 text-right tabular-nums whitespace-nowrap {% if r.unpaid %}text-rose-600{% else %}text-slate-400{% endif %}">{{ r.unpaid|money }}</td>
+          <td class="px-5 py-3 text-right">
+            <form method="post" action="{% url 'accounts:switch_shop' %}">{% csrf_token %}
+              <input type="hidden" name="next" value="{{ request.get_full_path }}">
+              <button name="shop" value="{{ r.shop.pk }}" class="d-link whitespace-nowrap">Détail →</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
 
 {% if missing_cost %}
 <div class="d-card d-wash-yellow mb-6 flex items-start gap-3 p-4 text-sm text-slate-700">
@@ -244,6 +290,7 @@
         <a href="{% url 'product:quick_stock' p.pk %}" class="d-row -mx-2 flex items-center gap-3 rounded-xl px-2 py-2 transition">
           <span class="min-w-0 flex-1">
             <span class="block truncate text-sm font-medium text-slate-800">{{ p.title }}</span>
+            {% if p.low_shops %}<span class="block truncate text-xs text-slate-500">{% for shop, qty in p.low_shops %}{% if not forloop.first %} · {% endif %}{{ shop.name }} : <b class="{% if qty == 0 %}text-rose-600{% else %}text-[#7a5a00]{% endif %}">{{ qty }}</b>{% endfor %}</span>{% endif %}
             <span class="mt-1.5 block h-1 overflow-hidden rounded-full bg-white"><span class="block h-full rounded-full {% if p.qty == 0 %}bg-rose-500{% else %}bg-[#fbc105]{% endif %}" style="width: {% widthratio p.qty threshold 100 %}%"></span></span>
           </span>
           {% if p.qty == 0 %}

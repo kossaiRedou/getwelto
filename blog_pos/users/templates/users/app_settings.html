@@ -25,7 +25,7 @@
         <p class="truncate text-sm text-white/80">{{ s.company_tagline|default:"Activité ou slogan" }}</p>
       </div>
       <div class="flex flex-wrap gap-2 text-xs">
-        <span class="rounded-full bg-white/15 px-3 py-1 font-semibold">Devise : {{ s.currency_label|default:"—" }}</span>
+        <span class="rounded-full bg-white/15 px-3 py-1 font-semibold">Devise : {{ currency }}</span>
         <span class="rounded-full bg-white/15 px-3 py-1 font-semibold">Stock bas &lt; {{ s.low_stock_threshold }}</span>
         <span class="inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1" title="Couleurs des factures">
           <span class="h-3.5 w-3.5 rounded-full ring-2 ring-white/60" style="background: {{ s.brand_color_primary }}"></span>
@@ -43,8 +43,8 @@
     <section class="d-card d-tint-blue grid gap-5 p-5 sm:p-6 lg:grid-cols-3 lg:gap-8">
       <div>
         <span class="d-chip mb-3 bg-[#0e6dfa]/10 text-[#0e6dfa]">{% icon 'box' 'h-[18px] w-[18px]' %}</span>
-        <h2 class="d-title">Boutique</h2>
-        <p class="mt-1 text-sm text-slate-500">Nom et logo affichés dans le menu, sur les tickets et les factures.</p>
+        <h2 class="d-title">Entreprise</h2>
+        <p class="mt-1 text-sm text-slate-500">Nom et logo communs à toutes vos boutiques : menu, tickets et factures. Adresse et téléphone se règlent par <a href="{% url 'accounts:shop_list' %}" class="font-semibold text-[#0e6dfa] hover:underline">boutique</a>.</p>
       </div>
       <div class="grid gap-4 sm:grid-cols-2 lg:col-span-2">
         {% include 'partials/field.html' with field=form.company_name %}
@@ -58,10 +58,14 @@
       <div>
         <span class="d-chip mb-3 bg-[#1b8650]/10 text-[#1b8650]">{% icon 'cash' 'h-[18px] w-[18px]' %}</span>
         <h2 class="d-title">Vente et stock</h2>
-        <p class="mt-1 text-sm text-slate-500">La devise suit chaque montant. Sous le seuil, un produit passe en « stock bas » <span class="ml-0.5 inline-block h-2 w-2 rounded-full bg-[#fbc105] align-middle"></span>.</p>
+        <p class="mt-1 text-sm text-slate-500">Sous le seuil, un produit passe en « stock bas » <span class="ml-0.5 inline-block h-2 w-2 rounded-full bg-[#fbc105] align-middle"></span> dans la boutique concernée.</p>
       </div>
       <div class="grid gap-4 sm:grid-cols-2 lg:col-span-2">
-        {% include 'partials/field.html' with field=form.currency_label %}
+        <div>
+          <p class="label">Devise</p>
+          <p class="input flex items-center bg-slate-50 font-semibold text-slate-700">{{ currency }}</p>
+          <p class="help">Celle du pays de votre compte ({{ account.get_country_display }}).</p>
+        </div>
         {% include 'partials/field.html' with field=form.low_stock_threshold %}
       </div>
     </section>

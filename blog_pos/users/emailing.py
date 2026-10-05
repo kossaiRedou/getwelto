@@ -16,7 +16,7 @@ logger = logging.getLogger('welto.email')
 
 def send_reset_code_email(user, code):
     """Envoie le code de réinitialisation. Retourne True si l'envoi a réussi."""
-    company = _company_name()
+    company = _company_name(user)
     subject = f'{company} — Code de réinitialisation de mot de passe'
     validity = _validity_minutes()
     message = (
@@ -40,12 +40,12 @@ def send_reset_code_email(user, code):
         return False
 
 
-def _company_name():
+def _company_name(user):
     try:
         from .models import AppSetting
-        name = AppSetting.get_solo().company_name
-        if name:
-            return name
+        if user.account_id:
+            setting = AppSetting.for_account(user.account)
+            return setting.company_name or user.account.name
     except Exception:
         pass
     return 'WELTO'

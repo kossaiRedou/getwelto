@@ -118,6 +118,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     'core',
+    'accounts',
     'product',
     'order',
     'client',
@@ -144,7 +145,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',  # Nécessaire pour les messages Django
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'users.middleware.SetupMiddleware',  # Middleware pour la configuration initiale
+    'accounts.middleware.TenantMiddleware',  # Compte client + boutique de chaque requête (SaaS)
 ]
 
 ROOT_URLCONF = 'blog_pos.urls'
@@ -353,6 +354,11 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = str(MEDIA_DIR)
 
 CURRENCY = os.getenv('CURRENCY', 'GNF')
+
+# SaaS : le propriétaire reçoit un email à chaque inscription (liste séparée par des virgules)
+# et ses coordonnées s'affichent aux clients bloqués ou en fin d'abonnement.
+ADMINS = [('WELTO', e.strip()) for e in os.getenv('SAAS_ADMIN_EMAILS', '').split(',') if e.strip()]
+SAAS_CONTACT = os.getenv('SAAS_CONTACT', '').strip()   # ex. « WhatsApp +224 620 00 00 00 »
 
 # ============================================
 # Email (récupération de mot de passe par code)

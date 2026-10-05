@@ -1,9 +1,8 @@
-import datetime
 from decimal import Decimal
 
 from django.contrib import messages
 from django.core.paginator import Paginator
-from django.db.models import Count, F, Sum
+from django.db.models import Count, Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -11,10 +10,8 @@ from django.views.decorators.http import require_POST
 
 from core.decorators import manager_required
 from core.utils import parse_iso_date
-from order.models import Order, OrderItem, Payment, PaymentMethod
-from product.models import Product
 from .forms import DepenseForm
-from .models import Depense, MouvementStock, TypeDepense, TypeMouvement
+from .models import Depense, MouvementStock, TypeMouvement
 
 ZERO = Decimal('0.00')
 APPRO = 'Approvisionnement'
@@ -42,7 +39,8 @@ def reports_view(request):
 def depense_list(request):
     today = timezone.localdate()
     start, end = _period(request, today.replace(day=1))
-    depenses = (Depense.objects.select_related('type_depense', 'created_by')
+    scope = request.scope
+    depenses = (scope.expenses().select_related('type_depense', 'created_by', 'shop')
                 .filter(date_depense__gte=start, date_depense__lte=end))
     type_id = request.GET.get('type', '')
     if type_id.isdigit():
@@ -52,7 +50,7 @@ def depense_list(request):
         'page_obj': page,
         'total': depenses.aggregate(s=Sum('montant'))['s'] or ZERO,
         'by_type': depenses.values('type_depense__nom').annotate(s=Sum('montant'), n=Count('id')).order_by('-s'),
-        'types': TypeDepense.objects.filter(actif=True),
+        'types': scope.expense_types().filter(actif=True),
         'type_id': type_id,
         'start': start,
         'end': end,
@@ -61,7 +59,7 @@ def depense_list(request):
 
 @manager_required
 def depense_create(request):
-    form = DepenseForm(request.POST or None, initial={'date_depense': timezone.localdate()})
+    form = DepenseForm(request.POST or None, initial={'date_depense': timezone.localdate()}, scope=request.scope)
     if request.method == 'POST' and form.is_valid():
         depense = form.save(commit=False)
         depense.created_by = request.user
@@ -74,7 +72,7 @@ def depense_create(request):
 @require_POST
 @manager_required
 def depense_delete(request, pk):
-    depense = get_object_or_404(Depense, pk=pk)
+    depense = get_object_or_404(Depense.objects.filter(account=request.scope.account), pk=pk)
     if MouvementStock.objects.filter(reference_depense=depense).exists():
         messages.error(request, "Cette dépense est liée à un approvisionnement : corrigez le stock du produit à la place.")
     else:
@@ -85,7 +83,8 @@ def depense_delete(request, pk):
 
 @manager_required
 def mouvement_list(request):
-    mouvements = MouvementStock.objects.select_related('produit', 'reference_commande', 'created_by')
+    scope = request.scope
+    mouvements = scope.movements().select_related('produit', 'reference_commande', 'created_by', 'shop')
     kind = request.GET.get('type', '')
     if kind in TypeMouvement.values:
         mouvements = mouvements.filter(type_mouvement=kind)
@@ -103,7 +102,7 @@ def mouvement_list(request):
         'page_obj': page,
         'types': TypeMouvement.choices,
         'kind': kind,
-        'products': Product.objects.order_by('title').values_list('id', 'title'),
+        'products': scope.products().order_by('title').values_list('id', 'title'),
         'product_id': product_id,
         'start': start,
         'end': end,

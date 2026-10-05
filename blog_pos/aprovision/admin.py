@@ -4,23 +4,25 @@ from .models import TypeDepense, Depense, MouvementStock
 
 @admin.register(TypeDepense)
 class TypeDepenseAdmin(admin.ModelAdmin):
-    list_display = ['nom', 'description', 'couleur', 'actif', 'created_at']
-    list_filter = ['actif', 'created_at']
+    list_display = ['nom', 'account', 'description', 'couleur', 'actif', 'created_at']
+    list_filter = ['actif', 'account', 'created_at']
     search_fields = ['nom', 'description']
     list_editable = ['actif', 'couleur']
 
 
 @admin.register(Depense)
 class DepenseAdmin(admin.ModelAdmin):
-    list_display = ['description', 'type_depense', 'tag_montant', 'date_depense', 'fournisseur', 'created_at']
-    list_filter = ['type_depense', 'date_depense', 'created_at']
+    list_display = ['description', 'account', 'shop', 'type_depense', 'tag_montant', 'date_depense', 'fournisseur',
+                    'created_at']
+    list_filter = ['account', 'date_depense', 'created_at']
+    list_select_related = ['account', 'shop', 'type_depense']
     search_fields = ['description', 'fournisseur', 'reference']
     date_hierarchy = 'date_depense'
     readonly_fields = ['created_at', 'created_by']
     
     fieldsets = (
         ('Informations principales', {
-            'fields': ('type_depense', 'description', 'montant', 'date_depense')
+            'fields': ('account', 'shop', 'type_depense', 'description', 'montant', 'date_depense')
         }),
         ('Détails fournisseur', {
             'fields': ('fournisseur', 'reference'),
@@ -45,9 +47,10 @@ class DepenseAdmin(admin.ModelAdmin):
 @admin.register(MouvementStock)
 class MouvementStockAdmin(admin.ModelAdmin):
     """Journal de stock : consultation seule (écrit uniquement par aprovision.services)."""
-    list_display = ['produit', 'type_mouvement', 'quantite', 'stock_avant', 'stock_apres',
+    list_display = ['produit', 'shop', 'type_mouvement', 'quantite', 'stock_avant', 'stock_apres',
                     'prix_achat_unitaire', 'date_mouvement', 'created_by']
-    list_filter = ['type_mouvement', 'date_mouvement', 'produit__category']
+    list_filter = ['type_mouvement', 'shop__account', 'date_mouvement']
+    list_select_related = ['produit', 'shop', 'created_by']
     search_fields = ['produit__title', 'description']
     date_hierarchy = 'date_mouvement'
 

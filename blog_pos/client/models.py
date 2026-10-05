@@ -14,7 +14,9 @@ def normalize_phone(raw):
 
 
 class Client(SyncUUIDMixin):
-    phone = models.CharField(max_length=20, unique=True, help_text="Numéro de téléphone (unique)")
+    """Client d'une boutique (chaque boutique a ses clients et leurs crédits)."""
+    shop = models.ForeignKey('accounts.Shop', on_delete=models.PROTECT, related_name='clients')
+    phone = models.CharField(max_length=20, help_text="Numéro de téléphone (unique dans la boutique)")
     name = models.CharField(max_length=150, help_text="Nom complet du client")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -24,6 +26,9 @@ class Client(SyncUUIDMixin):
         ordering = ['name']
         verbose_name = "Client"
         verbose_name_plural = "Clients"
+        constraints = [
+            models.UniqueConstraint(fields=['shop', 'phone'], name='client_unique_phone_per_shop'),
+        ]
 
     def __str__(self):
         return f"{self.name} ({self.phone})"
@@ -43,10 +48,11 @@ class Client(SyncUUIDMixin):
         return (self.orders.filter(is_paid=False)
                 .aggregate(s=Sum(F('final_value') - F('amount_paid')))['s'] or Decimal('0.00'))
 
-    @classmethod
-    def search(cls, query, limit=10):
+    @staticmethod
+    def search(queryset, query, limit=10):
+        """Recherche par nom ou téléphone dans `queryset` (les clients de la boutique)."""
         query = (query or '').strip()
-        qs = cls.objects.filter(is_active=True)
+        qs = queryset.filter(is_active=True)
         if not query:
             return qs.none()
         digits = ''.join(ch for ch in query if ch.isdigit())

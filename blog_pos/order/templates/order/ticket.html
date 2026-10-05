@@ -28,6 +28,7 @@
     {% if app_settings.company_logo %}<img src="{{ app_settings.company_logo.url }}" alt="" style="max-height:40px;max-width:60%"><br>{% endif %}
     <h1>{{ app_settings.company_name|default:"WELTO" }}</h1>
     {% if app_settings.company_tagline %}<div class="muted">{{ app_settings.company_tagline }}</div>{% endif %}
+    {% if shop %}<div class="muted">{{ shop.name }}{% if shop.address %} · {{ shop.address }}{% endif %}{% if shop.phone %} · {{ shop.phone }}{% endif %}</div>{% endif %}
   </div>
   <hr>
   <div>Vente : <span class="b">{{ order.title }}</span></div>

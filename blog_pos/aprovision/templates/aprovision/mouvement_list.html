@@ -28,7 +28,7 @@
       {% for m in page_obj %}
         <tr>
           <td class="num text-slate-500">{{ m.date_mouvement|date:"d/m/y H:i" }}</td>
-          <td class="font-medium">{{ m.produit.title }}</td>
+          <td class="font-medium">{{ m.produit.title }}{% if scope.all_shops %}<span class="block text-xs font-normal text-slate-400">{{ m.shop.name }}</span>{% endif %}</td>
           <td>{{ m.get_type_mouvement_display }}<span class="block text-xs text-slate-400">{% if m.reference_commande %}<a href="{{ m.reference_commande.get_absolute_url }}" class="hover:underline">{{ m.description }}</a>{% else %}{{ m.description }}{% endif %}</span></td>
           <td class="num text-right font-semibold {% if m.quantite > 0 %}text-emerald-700{% else %}text-rose-700{% endif %}">{% if m.quantite > 0 %}+{% endif %}{{ m.quantite }}</td>
           <td class="num text-right text-slate-500">{{ m.stock_avant }} → {{ m.stock_apres }}</td>

@@ -2,7 +2,6 @@ from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -12,37 +11,13 @@ from core.decorators import is_manager, manager_required
 from core.throttle import is_locked
 from .emailing import send_reset_code_email
 from .forms import (AppSettingForm, CustomUserChangeForm, CustomUserCreationForm, ForgotCodeForm,
-                    ForgotRequestForm, ManagerResetPasswordForm, PasswordChangeForm, SetupForm)
-from .models import AppSetting, PasswordResetCode, User
-
-
-def setup_view(request):
-    """Premier lancement : création du compte manager et de l'identité de la boutique."""
-    if User.objects.exists():
-        return redirect('users:login')
-    form = SetupForm(request.POST or None)
-    if request.method == 'POST' and form.is_valid():
-        with transaction.atomic():
-            user = form.save(commit=False)
-            user.role = 'manager'
-            user.is_staff = True
-            user.is_superuser = True
-            user.save()
-            settings_obj = AppSetting.get_solo()
-            settings_obj.company_name = form.cleaned_data['company_name']
-            settings_obj.currency_label = form.cleaned_data['currency_label']
-            settings_obj.save()
-        login(request, user)
-        messages.success(request, f'Bienvenue {user.first_name} ! Ajoutez vos produits pour commencer à vendre.')
-        return redirect('product:add_product')
-    return render(request, 'users/setup.html', {'form': form})
+                    ForgotRequestForm, ManagerResetPasswordForm, PasswordChangeForm)
+from .models import PasswordResetCode, User
 
 
 def login_view(request):
     if request.user.is_authenticated:
         return redirect('pos')
-    if not User.objects.exists():
-        return redirect('users:setup')
     if request.method == 'POST':
         username = request.POST.get('username', '').strip()
         password = request.POST.get('password', '')
@@ -51,8 +26,14 @@ def login_view(request):
                                     'ou demandez au gérant de réinitialiser votre mot de passe.')
             return render(request, 'users/login.html', {'username': username}, status=429)
         user = authenticate(request, username=username, password=password) if username and password else None
+        if user is not None and user.account_id and not user.account.is_open:
+            # Bon mot de passe, mais compte en attente, suspendu ou arrivé à sa date de fin.
+            messages.error(request, user.account.blocked_message())
+            return render(request, 'users/login.html', {'username': username})
         if user is not None:
             login(request, user)
+            if user.account_id is None:
+                return redirect('admin:index')   # propriétaire du SaaS
             next_url = request.GET.get('next', '')
             if next_url and url_has_allowed_host_and_scheme(next_url, {request.get_host()}, request.is_secure()) \
                     and not next_url.startswith('/admin/'):
@@ -70,7 +51,7 @@ def logout_view(request):
 
 @manager_required
 def app_settings_view(request):
-    settings_obj = AppSetting.get_solo()
+    settings_obj = request.scope.settings()
     form = AppSettingForm(request.POST or None, request.FILES or None, instance=settings_obj)
     if request.method == 'POST' and form.is_valid():
         form.save()
@@ -81,7 +62,7 @@ def app_settings_view(request):
 
 @manager_required
 def user_list_view(request):
-    users = User.objects.all().order_by('-is_active', 'first_name')
+    users = request.scope.users().select_related('shop').order_by('role', '-is_active', 'first_name')
     q = request.GET.get('q', '').strip()
     if q:
         users = users.filter(Q(first_name__icontains=q) | Q(last_name__icontains=q) |
@@ -92,7 +73,7 @@ def user_list_view(request):
 
 @manager_required
 def user_create_view(request):
-    form = CustomUserCreationForm(request.POST or None, request_user=request.user, initial={'role': 'employee'})
+    form = CustomUserCreationForm(request.POST or None, request_user=request.user, scope=request.scope)
     if request.method == 'POST' and form.is_valid():
         user = form.save()
         messages.success(request, f'Utilisateur « {user.get_full_name() or user.username} » créé.')
@@ -102,8 +83,9 @@ def user_create_view(request):
 
 @manager_required
 def user_update_view(request, pk):
-    target = get_object_or_404(User, pk=pk)
-    form = CustomUserChangeForm(request.POST or None, instance=target, request_user=request.user)
+    target = get_object_or_404(request.scope.users(), pk=pk)
+    form = CustomUserChangeForm(request.POST or None, instance=target, request_user=request.user,
+                                scope=request.scope)
     if request.method == 'POST' and form.is_valid():
         form.save()
         messages.success(request, f'Utilisateur « {target.get_full_name() or target.username} » modifié.')
@@ -114,8 +96,8 @@ def user_update_view(request, pk):
 
 @manager_required
 def user_delete_view(request, pk):
-    target = get_object_or_404(User, pk=pk)
-    if target == request.user:
+    target = get_object_or_404(request.scope.users(), pk=pk)
+    if target == request.user or target.role == 'manager':
         messages.error(request, 'Vous ne pouvez pas supprimer votre propre compte.')
         return redirect('users:user_list')
     if request.method == 'POST':
@@ -133,7 +115,7 @@ def user_delete_view(request, pk):
 @login_required
 def change_password_view(request, pk):
     """Un manager réinitialise le mot de passe d'un autre compte sans connaître l'ancien."""
-    target = get_object_or_404(User, pk=pk)
+    target = get_object_or_404(request.scope.users(), pk=pk)
     if target == request.user:
         return redirect('users:my_password_change')
     if not is_manager(request.user):

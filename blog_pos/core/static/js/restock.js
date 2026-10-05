@@ -16,8 +16,8 @@
   var esc = K.esc, norm = K.norm, fmt = K.fmt, parseMoney = K.parseMoney, toDecimal = K.toDecimal, toInput = K.toInput;
   // Seul le gérant change le prix de vente d'un produit existant (le serveur le vérifie aussi).
   var CAN_PRICE = root.dataset.canPrice === '1';
-  var STORE_CATALOG = 'welto.stockcatalog.v1';
-  var STORE_DRAFT = 'welto.restock.v1';
+  var STORE_CATALOG = 'welto.stockcatalog.v2.' + root.dataset.store;
+  var STORE_DRAFT = 'welto.restock.v2.' + root.dataset.store;
   var $ = function (id) { return document.getElementById(id); };
   var el = {
     search: $('search'), results: $('results'), lines: $('lines'), empty: $('empty'), count: $('count'), clear: $('clear'),

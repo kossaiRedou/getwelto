@@ -5,14 +5,10 @@ from decimal import Decimal
 
 from core.mixins import SyncableMixin
 
-def _currency():
-    from users.models import AppSetting
-    return AppSetting.get_currency_label()
-
-
 class TypeDepense(SyncableMixin):
-    """Types de dépenses pour catégoriser les dépenses"""
-    nom = models.CharField(max_length=100, unique=True, help_text="Ex: Approvisionnement, Matériel, Main d'œuvre")
+    """Types de dépenses pour catégoriser les dépenses (propres à chaque compte)"""
+    account = models.ForeignKey('accounts.Account', on_delete=models.CASCADE, related_name='expense_types')
+    nom = models.CharField(max_length=100, help_text="Ex: Approvisionnement, Matériel, Main d'œuvre")
     description = models.TextField(blank=True, help_text="Description du type de dépense")
     couleur = models.CharField(max_length=7, default="#007bff", help_text="Couleur hex pour l'affichage")
     actif = models.BooleanField(default=True)
@@ -22,13 +18,19 @@ class TypeDepense(SyncableMixin):
         verbose_name = "Type de Dépense"
         verbose_name_plural = "Types de Dépenses"
         ordering = ['nom']
+        constraints = [
+            models.UniqueConstraint(fields=['account', 'nom'], name='typedepense_unique_nom_per_account'),
+        ]
 
     def __str__(self):
         return self.nom
 
 
 class Depense(SyncableMixin):
-    """Enregistrement des dépenses du commerce"""
+    """Dépense d'une boutique, ou commune à l'entreprise (shop vide : salaire du gérant, transport…)."""
+    account = models.ForeignKey('accounts.Account', on_delete=models.CASCADE, related_name='expenses')
+    shop = models.ForeignKey('accounts.Shop', on_delete=models.PROTECT, null=True, blank=True,
+                             related_name='expenses', help_text="Vide : dépense commune à toutes les boutiques")
     type_depense = models.ForeignKey(TypeDepense, on_delete=models.PROTECT, related_name='depenses')
     description = models.CharField(max_length=200, help_text="Description de la dépense")
     montant = models.DecimalField(max_digits=14, decimal_places=2, help_text="Montant de la dépense")
@@ -52,10 +54,10 @@ class Depense(SyncableMixin):
         ]
 
     def __str__(self):
-        return f"{self.description} - {self.montant} {_currency()}"
+        return f"{self.description} - {self.montant} {self.account.currency}"
 
     def tag_montant(self):
-        return f"{self.montant} {_currency()}"
+        return f"{self.montant} {self.account.currency}"
     tag_montant.short_description = "Montant"
 
 
@@ -69,7 +71,8 @@ class TypeMouvement(models.TextChoices):
 
 
 class MouvementStock(SyncableMixin):
-    """Traçabilité des mouvements de stock"""
+    """Traçabilité des mouvements de stock (par boutique)"""
+    shop = models.ForeignKey('accounts.Shop', on_delete=models.PROTECT, related_name='movements')
     produit = models.ForeignKey('product.Product', on_delete=models.CASCADE, related_name='mouvements')
     type_mouvement = models.CharField(max_length=20, choices=TypeMouvement.choices)
     quantite = models.IntegerField(help_text="Quantité (positive pour entrée, négative pour sortie)")

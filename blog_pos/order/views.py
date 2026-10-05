@@ -12,12 +12,12 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
-from core.decorators import api_login_required, is_manager, manager_required
+from accounts.decorators import shop_required
+from core.decorators import api_login_required, manager_required
 from core.utils import format_money, json_etag_response, parse_iso_date, to_cents
-from product.models import DEFAULT_CATEGORY_COLOR, Category, Product, get_low_stock_threshold
-from users.models import AppSetting
+from product.models import DEFAULT_CATEGORY_COLOR
 from . import services, stats
-from .models import Order, Payment, PaymentMethod
+from .models import PaymentMethod
 
 ZERO = services.ZERO
 
@@ -25,30 +25,35 @@ ZERO = services.ZERO
 # ---------------------------------------------------------------- Caisse
 
 @login_required
+@shop_required
 def pos_view(request):
+    scope = request.scope
     return render(request, 'order/pos.html', {
         'methods': PaymentMethod.choices,
-        'my_day': None if is_manager(request.user) else stats.user_day(request.user, timezone.localdate()),
+        'my_day': None if scope.is_manager else stats.user_day(request.user, timezone.localdate()),
     })
 
 
 @require_GET
 @api_login_required
+@shop_required
 def api_catalog(request):
-    """Catalogue compact de la caisse, mis en cache par le navigateur (ETag → 304)."""
-    rows = (Product.objects.filter(active=True).order_by('title')
+    """Catalogue compact de la caisse (stock de la boutique), mis en cache par le navigateur (ETag → 304)."""
+    scope = request.scope
+    rows = (scope.products_with_qty().filter(active=True).order_by('title')
             .values_list('id', 'title', 'barcode', 'final_value', 'qty', 'category_id', 'color', 'category__color'))
     return json_etag_response(request, {
-        'currency': AppSetting.get_currency_label(),
+        'currency': scope.account.currency,
         'products': [[pid, title, barcode or '', to_cents(price), qty, cat or 0,
                       color or cat_color or DEFAULT_CATEGORY_COLOR]
                      for pid, title, barcode, price, qty, cat, color, cat_color in rows],
-        'categories': list(Category.objects.values_list('id', 'title', 'color')),
+        'categories': list(scope.categories().values_list('id', 'title', 'color')),
     })
 
 
 @require_POST
 @api_login_required
+@shop_required
 def api_checkout(request):
     try:
         payload = json.loads(request.body or b'{}')
@@ -58,6 +63,7 @@ def api_checkout(request):
         result = services.checkout(
             lines=payload.get('lines'),
             user=request.user,
+            shop=request.scope.shop,
             method=payload.get('method'),
             amount=payload.get('amount'),
             discount=payload.get('discount'),
@@ -92,7 +98,7 @@ def api_checkout(request):
 # ---------------------------------------------------------------- Ventes
 
 def _filtered_orders(request):
-    qs = Order.objects.select_related('client', 'created_by')
+    qs = request.scope.orders().select_related('client', 'created_by', 'shop')
     q = request.GET.get('q', '').strip()
     if q:
         qs = qs.filter(Q(title__icontains=q) | Q(client__name__icontains=q) | Q(client__phone__icontains=q))
@@ -130,36 +136,42 @@ def order_list(request):
     })
 
 
-def _order_context(order):
+def _order_context(request, order):
     return {
         'order': order,
         'items': order.order_items.select_related('product'),
         'payments': order.payments.select_related('created_by'),
         'client': order.client,
-        'app_settings': AppSetting.get_solo(),
+        'shop': order.shop,
+        'app_settings': request.scope.settings(),
     }
+
+
+def _get_order(request, pk):
+    """Vente accessible : toutes celles du compte pour le gérant, celles de sa boutique pour l'employé."""
+    return get_object_or_404(request.scope.reachable_orders().select_related('client', 'created_by', 'shop'), pk=pk)
 
 
 @login_required
 def order_detail(request, pk):
-    order = get_object_or_404(Order.objects.select_related('client', 'created_by'), pk=pk)
-    context = _order_context(order)
+    order = _get_order(request, pk)
+    context = _order_context(request, order)
     context['methods'] = PaymentMethod.choices
     return render(request, 'order/detail.html', context)
 
 
 @login_required
 def order_ticket(request, pk):
-    order = get_object_or_404(Order.objects.select_related('client', 'created_by'), pk=pk)
-    return render(request, 'order/ticket.html', _order_context(order))
+    order = _get_order(request, pk)
+    return render(request, 'order/ticket.html', _order_context(request, order))
 
 
 @login_required
 def invoice_pdf_view(request, pk):
     from xhtml2pdf import pisa
 
-    order = get_object_or_404(Order.objects.select_related('client'), pk=pk)
-    html = render_to_string('invoice/order_invoice_pdf.html', _order_context(order), request=request)
+    order = _get_order(request, pk)
+    html = render_to_string('invoice/order_invoice_pdf.html', _order_context(request, order), request=request)
     result = BytesIO()
     pdf = pisa.CreatePDF(src=html, dest=result)
     if pdf.err:
@@ -173,7 +185,7 @@ def invoice_pdf_view(request, pk):
 @require_POST
 @login_required
 def order_add_payment(request, pk):
-    order = get_object_or_404(Order, pk=pk)
+    order = _get_order(request, pk)
     try:
         payment = services.add_payment(order.pk, request.POST.get('amount'), request.POST.get('method'),
                                        user=request.user, note=request.POST.get('note', ''))
@@ -186,7 +198,7 @@ def order_add_payment(request, pk):
 @require_POST
 @manager_required
 def order_delete_payment(request, pk, payment_id):
-    order = get_object_or_404(Order, pk=pk)
+    order = _get_order(request, pk)
     try:
         services.delete_payment(order.pk, payment_id)
         messages.success(request, 'Paiement supprimé.')
@@ -198,7 +210,7 @@ def order_delete_payment(request, pk, payment_id):
 @require_POST
 @manager_required
 def order_cancel(request, pk):
-    order = get_object_or_404(Order, pk=pk)
+    order = _get_order(request, pk)
     title = services.cancel_sale(order.pk, user=request.user)
     messages.success(request, f'Vente {title} annulée : les articles sont remis en stock.')
     return redirect('order_list')
@@ -230,13 +242,14 @@ def dashboard_view(request):
     if start > end:
         start, end = end, start
     days = (end - start).days + 1
+    scope = request.scope
 
-    cur = stats.period_figures(start, end)
+    cur = stats.period_figures(scope, start, end)
     prev_start, prev_end = stats.previous_period(start, end)
-    prev = stats.period_figures(prev_start, prev_end)
+    prev = stats.period_figures(scope, prev_start, prev_end)
     sales = cur['sales']
 
-    payments = Payment.objects.filter(date__gte=start, date__lte=end)
+    payments = scope.payments().filter(date__gte=start, date__lte=end)
     collected = payments.aggregate(s=Sum('amount'))['s'] or ZERO
     labels = dict(PaymentMethod.choices)
     by_method = [{'label': labels.get(row['method'], row['method']), 'total': row['s']}
@@ -244,7 +257,7 @@ def dashboard_view(request):
 
     # Un seul jour : on montre la semaine qui se termine ce jour-là, jour choisi en avant.
     if days == 1:
-        series = stats.daily_series(Order.objects.all(), end - datetime.timedelta(days=6), end)
+        series = stats.daily_series(scope.orders(), end - datetime.timedelta(days=6), end)
         for d in series:
             d['hl'] = d['date'] == end
     elif days <= 62:
@@ -254,10 +267,17 @@ def dashboard_view(request):
     else:
         series = None
 
-    unpaid = Order.objects.filter(is_paid=False).aggregate(
+    unpaid = scope.orders().filter(is_paid=False).aggregate(
         s=Sum(F('final_value') - F('amount_paid')), n=Count('id'))
-    threshold = get_low_stock_threshold()
-    low_stock = Product.objects.filter(active=True, qty__lt=threshold)
+    threshold = scope.settings().low_stock_threshold
+    low_stock = scope.low_stock(scope.products_with_qty().filter(active=True), threshold)
+    low_list = list(low_stock.order_by('qty', 'title')[:8])
+    if scope.all_shops:
+        # Vue d'ensemble : on précise dans quelle(s) boutique(s) le produit manque.
+        detail = scope.stock_by_shop([p.pk for p in low_list])
+        for p in low_list:
+            p.low_shops = [(shop, qty) for shop, qty in detail[p.pk] if qty < threshold]
+            p.qty = min((qty for _, qty in p.low_shops), default=p.qty)   # la boutique la plus en manque
 
     return render(request, 'order/dashboard.html', {
         'today': today,
@@ -295,6 +315,7 @@ def dashboard_view(request):
         'unpaid_count': unpaid['n'],
         'threshold': threshold,
         'low_count': low_stock.count(),
-        'low_stock': low_stock.order_by('qty', 'title')[:8],
-        'recent_orders': Order.objects.select_related('client')[:6],
+        'low_stock': low_list,
+        'recent_orders': scope.orders().select_related('client', 'shop')[:6],
+        'by_shop': stats.shop_breakdown(scope, start, end) if scope.all_shops and scope.multi_shop else None,
     })

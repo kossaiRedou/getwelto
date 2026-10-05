@@ -1,20 +1,20 @@
 from django.contrib import admin
 from .models import Client
-from users.models import AppSetting
 
 
 @admin.register(Client)
 class ClientAdmin(admin.ModelAdmin):
     """Administration des clients"""
-    list_display = ['name', 'phone', 'total_orders', 'total_spent', 'is_active', 'created_at']
-    list_filter = ['is_active', 'created_at']
-    search_fields = ['name', 'phone']
+    list_display = ['name', 'phone', 'shop', 'total_orders', 'total_spent', 'is_active', 'created_at']
+    list_filter = ['is_active', 'shop__account', 'created_at']
+    search_fields = ['name', 'phone', 'shop__name', 'shop__account__name']
+    list_select_related = ['shop']
     readonly_fields = ['created_at', 'updated_at', 'total_orders', 'total_spent']
     ordering = ['-created_at']
     
     fieldsets = (
         ('Informations Client', {
-            'fields': ('name', 'phone', 'is_active')
+            'fields': ('shop', 'name', 'phone', 'is_active')
         }),
         ('Statistiques', {
             'fields': ('total_orders', 'total_spent'),
@@ -33,5 +33,5 @@ class ClientAdmin(admin.ModelAdmin):
     
     def total_spent(self, obj):
         """Afficher le montant total dépensé"""
-        return f"{obj.total_spent()} {AppSetting.get_currency_label()}"
+        return f"{obj.total_spent()} {obj.shop.account.currency}"
     total_spent.short_description = 'Total Dépensé'

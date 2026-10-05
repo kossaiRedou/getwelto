@@ -11,6 +11,7 @@
 @source "../client/templates/client";
 @source "../aprovision/templates/aprovision";
 @source "../users/templates/users";
+@source "../accounts/templates/accounts";
 @source "../core/static/js";
 @source "../**/forms.py";
 @source "../core/templatetags";
@@ -165,13 +166,16 @@
 
 /* Mise en page adaptative (hors couches : prioritaire sur les utilitaires).
    Tablette en paysage (1024–1279 px) : menu réduit aux icônes pour laisser la place au contenu. */
+.sidebar .shop-compact { display: none; }
 @media (min-width: 64rem) {
+  .sidebar .shop-compact { display: block; }
   .sidebar { width: 4.5rem; }
   .sidebar .nav-label, .sidebar .nav-section { display: none; }
   .sidebar .nav-link, .sidebar .brand { justify-content: center; padding-left: 0; padding-right: 0; }
   .content-shift { padding-left: 4.5rem; }
 }
 @media (min-width: 80rem) {
+  .sidebar .shop-compact { display: none; }
   .sidebar { width: 15rem; }
   .sidebar .nav-label { display: inline; }
   .sidebar .nav-section { display: block; }

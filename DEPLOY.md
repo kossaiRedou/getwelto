@@ -33,7 +33,9 @@ Onglet **Environment Variables** :
 | `CSRF_TRUSTED_ORIGINS` | `https://caisse.maboutique.com` | obligatoire |
 | `TIME_ZONE` | `Africa/Conakry` (Guinée) ou `Africa/Banjul` (Gambie) | recommandé |
 | `WEB_CONCURRENCY` | `2` (défaut) : suffisant pour une boutique ; augmenter seulement si le VPS a de la mémoire libre | facultatif |
-| `EMAIL_HOST`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` | pour le mot de passe oublié | facultatif |
+| `EMAIL_HOST`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` | pour le mot de passe oublié et l'alerte d'inscription | facultatif |
+| `SAAS_ADMIN_EMAILS` | votre email : vous êtes prévenu à chaque nouvelle inscription (plusieurs : séparés par des virgules) | recommandé |
+| `SAAS_CONTACT` | ce que voient vos clients bloqués ou en fin d'abonnement, ex. `WhatsApp +224 620 00 00 00` | recommandé |
 
 L'image fonctionne d'office en mode production : `DEBUG` désactivé, HTTPS (cookies sécurisés, HSTS), fichier `.env` ignoré.
 **Si une variable obligatoire manque, l'application refuse de démarrer** et le journal du conteneur indique laquelle — c'est voulu, pour ne jamais tourner avec une configuration incomplète (par exemple sans PostgreSQL).
@@ -50,7 +52,29 @@ Il contient le logo, la signature, le cachet et les journaux. Les ventes, elles,
 Cliquer **Deploy**. Le premier build prend 2 à 4 minutes. Il installe Python, compile le CSS Tailwind et prépare les fichiers statiques compressés.
 Les migrations de la base s'appliquent automatiquement à chaque démarrage.
 
-Ouvrir `https://caisse.maboutique.com` : la page **Bienvenue** demande le nom de la boutique, la devise et crée le compte du gérant.
+Créer ensuite **votre** compte de propriétaire du SaaS (une seule fois) : dans Coolify, onglet **Terminal** du conteneur :
+
+```
+python manage.py createsuperuser
+```
+
+Ce compte n'appartient à aucun client : il ouvre directement l'admin (`https://caisse.maboutique.com/admin/`).
+
+### Mise à jour d'une installation existante (avant le SaaS)
+
+Les migrations ne suppriment rien : les données déjà présentes (produits, ventes, clients, stock…) deviennent le
+**premier compte client**, avec une seule boutique, actif et sans date de fin. Son gérant garde ses identifiants.
+Pour repartir de zéro, supprimez ce compte dans l'admin (action « Supprimer définitivement avec toutes les données »).
+
+## Gérer les comptes clients (admin Django)
+
+- Un client s'inscrit sur `/inscription/` (lien sous la page de connexion). Son compte reste **en attente** : il ne peut pas se connecter.
+- **Comptes clients** → filtre *statut* « En attente » → cocher le compte → action **Activer / prolonger de 1, 3, 6 ou 12 mois**.
+  Un compte encore actif est prolongé à partir de sa date de fin, sans perdre de jours.
+- La date de fin (« Actif jusqu'au », dernier jour inclus) et le **nombre de boutiques autorisées** se modifient aussi directement dans la liste.
+- 7 jours avant la fin, le gérant voit un rappel en haut de ses pages. Le lendemain de la date de fin, plus personne du compte ne peut se connecter ; les données restent intactes et reviennent dès que vous prolongez.
+- **Suspendre** bloque l'accès immédiatement, sans rien supprimer.
+- Un compte = un pays = une devise. Le même client dans deux pays = deux comptes.
 
 ## 6. Cloudflare
 
@@ -64,7 +88,7 @@ Ouvrir `https://caisse.maboutique.com` : la page **Bienvenue** demande le nom de
 ## 7. Vérifications après la mise en ligne
 
 1. `https://caisse.maboutique.com/healthz` affiche `ok`.
-2. La page **Bienvenue** s'affiche : créer la boutique et le compte du gérant.
+2. Créer un compte client de test sur `/inscription/`, l'activer dans l'admin, puis s'y connecter.
 3. Créer 2 ou 3 produits, faire une vente test puis l'**annuler** (Ventes → la vente → Annuler) : le stock revient à sa valeur.
 4. Sur la tablette : ouvrir la caisse, tester la douchette et le bouton appareil photo (le navigateur demande l'autorisation la première fois).
 5. Dans la base PostgreSQL de Coolify, lancer une première sauvegarde manuelle (**Backup now**).

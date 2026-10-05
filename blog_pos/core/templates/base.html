@@ -16,8 +16,29 @@
 <aside class="sidebar fixed inset-y-0 left-0 z-40 flex w-64 -translate-x-full flex-col bg-navy-900 transition-transform lg:translate-x-0 [.nav-open_&]:translate-x-0">
   <a href="{% url 'pos' %}" class="brand flex h-14 shrink-0 items-center gap-2.5 border-b border-white/5 px-4" title="{{ company_name|default:'WELTO' }}">
     <span class="logo-mark h-8 w-8 shrink-0 text-sm">W</span>
-    <span class="nav-label truncate font-semibold text-white">{{ company_name|default:"WELTO" }}</span>
+    <span class="nav-label min-w-0">
+      <span class="block truncate font-semibold text-white">{{ company_name|default:"WELTO" }}</span>
+      {% if scope.shop and not scope.multi_shop %}<span class="block truncate text-xs text-slate-400">{{ scope.shop.name }}</span>{% endif %}
+    </span>
   </a>
+  {% if scope.multi_shop %}
+  {# Gérant multi-boutiques : boutique affichée, ou vue d'ensemble #}
+  <form method="post" action="{% url 'accounts:switch_shop' %}" class="border-b border-white/5 px-3 py-2.5">{% csrf_token %}
+    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+    <label for="shop-switch" class="nav-section mb-1 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Boutique</label>
+    <select id="shop-switch" name="shop" data-autosubmit aria-label="Boutique affichée"
+            class="nav-section w-full rounded-lg border border-white/10 bg-navy-800 px-2.5 py-2 text-sm font-semibold text-white focus:border-brand-400 focus:outline-none">
+      <option value="all"{% if scope.all_shops %} selected{% endif %}>Toutes les boutiques</option>
+      {% for s in scope.shops %}<option value="{{ s.pk }}"{% if scope.shop.pk == s.pk %} selected{% endif %}>{{ s.name }}</option>{% endfor %}
+    </select>
+    <select name="shop" data-autosubmit aria-label="Boutique affichée" title="Boutique affichée"
+            class="shop-compact w-full rounded-lg border border-white/10 bg-navy-800 px-1 py-1.5 text-center text-xs font-bold text-white">
+      <option value="all"{% if scope.all_shops %} selected{% endif %}>Tout</option>
+      {% for s in scope.shops %}<option value="{{ s.pk }}"{% if scope.shop.pk == s.pk %} selected{% endif %}>{{ s.code }}</option>{% endfor %}
+    </select>
+    <noscript><button class="mt-2 w-full rounded-lg bg-brand-600 py-1.5 text-xs font-semibold text-white">Afficher</button></noscript>
+  </form>
+  {% endif %}
   <nav class="flex-1 space-y-1 overflow-y-auto p-3">
     <a href="{% url 'pos' %}" title="Caisse" class="nav-link {% if rm.url_name == 'pos' %}active{% endif %}">{% icon 'cart' %}<span class="nav-label">Caisse</span></a>
     <a href="{% url 'order_list' %}" title="Ventes" class="nav-link {% if rm.url_name == 'order_list' or rm.url_name == 'order_detail' %}active{% endif %}">{% icon 'receipt' %}<span class="nav-label">Ventes</span></a>
@@ -29,6 +50,7 @@
     <a href="{% url 'dashboard' %}" title="Tableau de bord" class="nav-link {% if rm.url_name == 'dashboard' %}active{% endif %}">{% icon 'dashboard' %}<span class="nav-label">Tableau de bord</span></a>
     <a href="{% url 'aprovision:depense_list' %}" title="Dépenses" class="nav-link {% if rm.url_name == 'depense_list' or rm.url_name == 'nouvelle_depense' %}active{% endif %}">{% icon 'wallet' %}<span class="nav-label">Dépenses</span></a>
     <a href="{% url 'aprovision:mouvement_list' %}" title="Mouvements de stock" class="nav-link {% if rm.url_name == 'mouvement_list' %}active{% endif %}">{% icon 'layers' %}<span class="nav-label">Mouvements de stock</span></a>
+    <a href="{% url 'accounts:shop_list' %}" title="Boutiques" class="nav-link {% if rm.namespace == 'accounts' %}active{% endif %}">{% icon 'store' %}<span class="nav-label">Boutiques</span></a>
     <a href="{% url 'users:user_list' %}" title="Utilisateurs" class="nav-link {% if rm.namespace == 'users' and rm.url_name != 'app_settings' and rm.url_name != 'my_password_change' %}active{% endif %}">{% icon 'user' %}<span class="nav-label">Utilisateurs</span></a>
     <a href="{% url 'users:app_settings' %}" title="Paramètres" class="nav-link {% if rm.url_name == 'app_settings' %}active{% endif %}">{% icon 'settings' %}<span class="nav-label">Paramètres</span></a>
     {% endif %}
@@ -53,6 +75,13 @@
     <div class="ml-auto flex items-center gap-2">{% block topbar_actions %}{% endblock %}</div>
   </header>
   <main class="{% block main_class %}mx-auto w-full max-w-6xl flex-1 px-4 py-5 sm:px-6 lg:py-8{% endblock %}">
+    {% block expiry %}{% if scope.is_manager and account.expires_soon %}
+    <div class="mb-4 flex items-start gap-3 rounded-xl border border-[#fbc105]/60 bg-[#fbc105]/15 px-4 py-3 text-sm text-slate-800">
+      {% icon 'clock' 'h-5 w-5 shrink-0 text-[#7a5a00]' %}
+      <p>Votre abonnement WELTO se termine {% if account.days_left == 0 %}<b>aujourd'hui</b>{% elif account.days_left == 1 %}<b>demain</b>{% else %}dans <b>{{ account.days_left }} jours</b>{% endif %} (le {{ account.active_until|date:"j F Y" }}).
+        Pour continuer sans interruption, contactez {% if saas_contact %}<b>{{ saas_contact }}</b>{% else %}votre fournisseur WELTO{% endif %}.</p>
+    </div>
+    {% endif %}{% endblock %}
     {% include 'partials/messages.html' %}
     {% block content %}{% endblock %}
   </main>

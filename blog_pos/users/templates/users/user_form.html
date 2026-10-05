@@ -32,9 +32,9 @@
     </section>
     <section class="form-section">
       <div><h2 class="form-section-title">Accès</h2>
-        <p class="form-section-desc"><b>Employé</b> : caisse, ventes, clients.<br><b>Manager</b> : tout, y compris produits, stock, dépenses, rapports et utilisateurs.</p></div>
+        <p class="form-section-desc">{% if target.role == 'manager' %}<b>Gérant</b> : toutes les boutiques et toute la gestion.{% else %}<b>Employé</b> : caisse, réception, ventes et clients de sa boutique uniquement.{% endif %}</p></div>
       <div class="grid gap-4 lg:col-span-2">
-        {% include 'partials/field.html' with field=form.role %}
+        {% if form.shop %}{% include 'partials/field.html' with field=form.shop %}{% endif %}
         {% if form.is_active %}{% include 'partials/field.html' with field=form.is_active %}{% endif %}
       </div>
     </section>

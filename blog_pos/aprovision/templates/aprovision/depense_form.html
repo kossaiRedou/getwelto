@@ -21,6 +21,7 @@
         {% include 'partials/field.html' with field=form.date_depense %}
         {% include 'partials/field.html' with field=form.type_depense %}
         {% include 'partials/field.html' with field=form.new_type %}
+        {% if form.where %}{% include 'partials/field.html' with field=form.where class='sm:col-span-2' %}{% endif %}
         {% include 'partials/field.html' with field=form.description class='sm:col-span-2' %}
       </div>
     </section>

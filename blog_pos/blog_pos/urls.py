@@ -10,6 +10,7 @@ urlpatterns = [
     path('healthz', lambda request: HttpResponse('ok', content_type='text/plain'), name='healthz'),
     path('admin/', admin.site.urls),
     path('users/', include('users.urls')),
+    path('', include('accounts.urls')),
 
     # Caisse
     path('', order_views.pos_view, name='pos'),

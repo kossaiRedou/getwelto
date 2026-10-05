@@ -9,7 +9,7 @@ la cohérence même en cas de bug applicatif.
 from decimal import Decimal
 
 from django.conf import settings
-from django.db import models
+from django.db import models, transaction
 from django.db.models import F, Q, Sum
 from django.urls import reverse
 from django.utils import timezone
@@ -40,8 +40,9 @@ class PaymentMethod(models.TextChoices):
 
 
 class Order(SyncableMixin):
+    shop = models.ForeignKey('accounts.Shop', on_delete=models.PROTECT, related_name='orders')
     date = models.DateField(default=timezone.localdate)
-    title = models.CharField(blank=True, max_length=150, help_text="Numéro de vente (V-000123)")
+    title = models.CharField(blank=True, max_length=150, help_text="Numéro de vente (KAL-000123)")
     timestamp = models.DateTimeField(default=timezone.now)
     value = models.DecimalField(default=ZERO, decimal_places=2, max_digits=20, help_text="Sous-total des lignes")
     discount = models.DecimalField(default=ZERO, decimal_places=2, max_digits=20)
@@ -58,6 +59,7 @@ class Order(SyncableMixin):
     class Meta:
         ordering = ['-timestamp']
         constraints = [
+            models.UniqueConstraint(fields=['shop', 'title'], name='order_unique_title_per_shop'),
             models.CheckConstraint(condition=Q(value__gte=0), name='order_value_gte_0'),
             models.CheckConstraint(condition=Q(discount__gte=0), name='order_discount_gte_0'),
             models.CheckConstraint(condition=Q(discount__lte=F('value')), name='order_discount_lte_value'),
@@ -77,15 +79,17 @@ class Order(SyncableMixin):
     def __str__(self):
         return self.title or f'Vente #{self.pk}'
 
-    @staticmethod
-    def number_for(pk):
-        return f'V-{pk:06d}'
-
     def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
         if not self.title:
-            self.title = self.number_for(self.pk)
-            type(self).objects.filter(pk=self.pk).update(title=self.title)
+            # Numéro suivant de la boutique (KAL-000124), sous verrou : jamais deux fois le même.
+            from accounts.models import Shop
+            with transaction.atomic():
+                shop = Shop.objects.select_for_update().get(pk=self.shop_id)
+                Shop.objects.filter(pk=shop.pk).update(next_number=shop.next_number + 1)
+                self.title = f'{shop.code}-{shop.next_number + 1:06d}'
+                super().save(*args, **kwargs)
+            return
+        super().save(*args, **kwargs)
 
     def get_absolute_url(self):
         return reverse('order_detail', kwargs={'pk': self.pk})

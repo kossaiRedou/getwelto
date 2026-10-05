@@ -304,6 +304,7 @@
             <td style="width: 65%;">
                 <div class="company-name">{{ app_settings.company_name|default:'Mon Entreprise' }}</div>
                 <div class="company-info">{{ app_settings.company_tagline }}</div>
+                {% if shop %}<div class="company-info">{{ shop.name }}{% if shop.address %} &mdash; {{ shop.address }}{% endif %}{% if shop.phone %} &mdash; T&eacute;l. {{ shop.phone }}{% endif %}</div>{% endif %}
             </td>
             <td style="width: 35%; text-align: right;">
                 {% if app_settings and app_settings.company_logo %}

@@ -5,9 +5,8 @@ from decimal import Decimal
 from django.test import TestCase
 from django.urls import reverse
 
+from core.testing import make_account, make_employee, stock_qty
 from product.models import Category, Product
-from users.middleware import SetupMiddleware
-from users.models import User
 from .models import Depense, MouvementStock, TypeMouvement
 from .services import StockError, adjust_stock, receive
 
@@ -17,19 +16,18 @@ D = Decimal
 class ReceptionTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.manager = User.objects.create_user('chef', password='x' * 10, role='manager')
-        cls.employee = User.objects.create_user('caisse', password='x' * 10, role='employee')
-        cls.cat = Category.objects.create(title='Épicerie')
+        cls.account, (cls.shop,), cls.manager = make_account()
+        cls.employee = make_employee(cls.shop, 'caisse')
+        cls.cat = Category.objects.create(account=cls.account, title='Épicerie')
 
     def setUp(self):
-        SetupMiddleware.setup_done = False
-        self.riz = Product.objects.create(title='Riz 5kg', value=D('25000'), prix_achat=D('20000'))
-        adjust_stock(self.riz.pk, 'add', 10, description='init')
-        self.huile = Product.objects.create(title='Huile 1L', value=D('12000'), barcode='111')
+        self.riz = Product.objects.create(account=self.account, title='Riz 5kg', value=D('25000'),
+                                          prix_achat=D('20000'))
+        adjust_stock(self.riz.pk, 'add', 10, shop=self.shop, description='init')
+        self.huile = Product.objects.create(account=self.account, title='Huile 1L', value=D('12000'), barcode='111')
 
     def qty(self, product):
-        product.refresh_from_db()
-        return product.qty
+        return stock_qty(self.shop, product)
 
     def test_existing_and_new_products_in_one_reception(self):
         result = receive([
@@ -37,18 +35,18 @@ class ReceptionTests(TestCase):
             {'product_id': self.huile.pk, 'qty': 6, 'unit_cost': '10000.50'},
             {'new': {'title': 'Sucre 1kg', 'barcode': '6001234567890', 'category_id': self.cat.pk, 'price': '8000'},
              'qty': 12, 'unit_cost': '6500'},
-        ], user=self.manager, fournisseur='Grossiste Madina', reference='F-42')
+        ], user=self.manager, shop=self.shop, fournisseur='Grossiste Madina', reference='F-42')
         self.assertEqual((result['lines'], result['units'], result['created']), (3, 38, 1))
         self.assertEqual(result['total'], D('420000') + D('60003.00') + D('78000'))
 
         self.riz.refresh_from_db()
-        self.assertEqual((self.riz.qty, self.riz.prix_achat, self.riz.value, self.riz.final_value),
+        self.assertEqual((self.qty(self.riz), self.riz.prix_achat, self.riz.value, self.riz.final_value),
                          (30, D('21000'), D('26000'), D('26000')))
         self.huile.refresh_from_db()
-        self.assertEqual((self.huile.qty, self.huile.prix_achat, self.huile.value), (6, D('10000.50'), D('12000')))
+        self.assertEqual((self.qty(self.huile), self.huile.prix_achat, self.huile.value), (6, D('10000.50'), D('12000')))
         sucre = Product.objects.get(title='Sucre 1kg')
-        self.assertEqual((sucre.qty, sucre.barcode, sucre.category, sucre.value, sucre.prix_achat),
-                         (12, '6001234567890', self.cat, D('8000'), D('6500')))
+        self.assertEqual((self.qty(sucre), sucre.account, sucre.barcode, sucre.category, sucre.value, sucre.prix_achat),
+                         (12, self.account, '6001234567890', self.cat, D('8000'), D('6500')))
 
         depense = Depense.objects.get()
         self.assertEqual((depense.montant, depense.fournisseur, depense.reference), (result['total'], 'Grossiste Madina', 'F-42'))
@@ -62,8 +60,8 @@ class ReceptionTests(TestCase):
     def test_idempotent(self):
         key = uuid.uuid4()
         lines = [{'product_id': self.riz.pk, 'qty': 5, 'unit_cost': '20000'}]
-        self.assertIsNotNone(receive(lines, user=self.manager, key=key))
-        self.assertIsNone(receive(lines, user=self.manager, key=key))
+        self.assertIsNotNone(receive(lines, user=self.manager, shop=self.shop, key=key))
+        self.assertIsNone(receive(lines, user=self.manager, shop=self.shop, key=key))
         self.assertEqual(self.qty(self.riz), 15)
         self.assertEqual(Depense.objects.count(), 1)
 
@@ -72,24 +70,24 @@ class ReceptionTests(TestCase):
             receive([
                 {'product_id': self.riz.pk, 'qty': 5, 'unit_cost': '20000'},
                 {'new': {'title': 'huile 1l', 'price': '9000'}, 'qty': 1, 'unit_cost': '7000'},
-            ], user=self.manager)
+            ], user=self.manager, shop=self.shop)
         self.assertEqual(self.qty(self.riz), 10)
         self.assertFalse(Depense.objects.exists())
         self.assertEqual(Product.objects.count(), 2)
 
     def test_barcode_rules(self):
         with self.assertRaises(StockError):   # code déjà utilisé par un autre produit
-            receive([{'product_id': self.riz.pk, 'qty': 1, 'unit_cost': '0', 'barcode': '111'}], user=self.manager)
-        receive([{'product_id': self.riz.pk, 'qty': 1, 'unit_cost': '0', 'barcode': '222'}], user=self.manager)
+            receive([{'product_id': self.riz.pk, 'qty': 1, 'unit_cost': '0', 'barcode': '111'}], user=self.manager, shop=self.shop)
+        receive([{'product_id': self.riz.pk, 'qty': 1, 'unit_cost': '0', 'barcode': '222'}], user=self.manager, shop=self.shop)
         self.riz.refresh_from_db()
         self.assertEqual(self.riz.barcode, '222')
         with self.assertRaises(StockError):   # même code deux fois dans le bon
             receive([{'product_id': self.riz.pk, 'qty': 1, 'unit_cost': '0', 'barcode': '333'},
                      {'new': {'title': 'Sel', 'barcode': '333', 'price': '500'}, 'qty': 1, 'unit_cost': '0'}],
-                    user=self.manager)
+                    user=self.manager, shop=self.shop)
 
     def test_free_goods_create_no_expense(self):
-        receive([{'product_id': self.huile.pk, 'qty': 3, 'unit_cost': '0'}], user=self.manager)
+        receive([{'product_id': self.huile.pk, 'qty': 3, 'unit_cost': '0'}], user=self.manager, shop=self.shop)
         self.assertEqual(self.qty(self.huile), 3)
         self.assertFalse(Depense.objects.exists())
         self.assertIsNone(MouvementStock.objects.get(produit=self.huile).cout_total)
@@ -97,7 +95,7 @@ class ReceptionTests(TestCase):
     def test_price_below_promo_refused(self):
         Product.objects.filter(pk=self.riz.pk).update(discount_value=D('24000'), final_value=D('24000'))
         with self.assertRaises(StockError):
-            receive([{'product_id': self.riz.pk, 'qty': 1, 'unit_cost': '20000', 'price': '23000'}], user=self.manager)
+            receive([{'product_id': self.riz.pk, 'qty': 1, 'unit_cost': '20000', 'price': '23000'}], user=self.manager, shop=self.shop)
 
     def test_invalid_lines(self):
         bad = [
@@ -114,7 +112,7 @@ class ReceptionTests(TestCase):
         ]
         for lines in bad:
             with self.subTest(lines=lines), self.assertRaises(StockError):
-                receive(lines, user=self.manager)
+                receive(lines, user=self.manager, shop=self.shop)
         self.assertEqual(self.qty(self.riz), 10)
 
     def post(self, data):
@@ -159,7 +157,7 @@ class ReceptionTests(TestCase):
         self.assertEqual(r.status_code, 400)
         self.assertIn('gérant', r.json()['error'])
         self.riz.refresh_from_db()
-        self.assertEqual((self.riz.value, self.riz.qty), (D('25000'), 10))   # rien n'a bougé
+        self.assertEqual((self.riz.value, self.qty(self.riz)), (D('25000'), 10))   # rien n'a bougé
         # Prix inchangé renvoyé : accepté. Nouveau produit : l'employé fixe son prix.
         r = self.post({'lines': [{'product_id': self.riz.pk, 'qty': 1, 'unit_cost': '21000', 'price': '25000'},
                                  {'new': {'title': 'Sucre 1kg', 'price': '9000'}, 'qty': 4, 'unit_cost': '7000'}],

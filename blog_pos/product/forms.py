@@ -46,20 +46,27 @@ class ProductForm(StyledFormMixin, forms.ModelForm):
             'prix_achat': forms.NumberInput(attrs=MONEY_ATTRS),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, account, shop=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.account = account
+        if not self.instance.pk:
+            self.instance.account = account
+        self.fields['category'].queryset = Category.objects.filter(account=account)
         self.fields['category'].empty_label = None
         self.fields['category'].required = False
         if not self.instance.pk and not self.initial.get('category'):
-            self.initial['category'] = Category.get_default().pk
+            self.initial['category'] = Category.get_default(account).pk
         self.fields['color'].widget = ColorSwatches(choices=[('', 'Comme la catégorie')] + COLOR_CHOICES)
         self.fields['barcode'].required = False
         for name in ('discount_value', 'prix_achat'):
             self.fields[name].required = False
             if not self.is_bound and not self.initial.get(name):
                 self.initial[name] = None   # champ vide plutôt que « 0 »
-        if self.instance.pk:
+        if self.instance.pk or shop is None:
+            # Stock initial : seulement à la création, dans la boutique choisie.
             del self.fields['initial_qty']
+        else:
+            self.fields['initial_qty'].help_text = f"Quantité déjà à {shop} (sans créer de dépense)."
 
     def clean_discount_value(self):
         return self.cleaned_data.get('discount_value') or Decimal('0')
@@ -73,8 +80,20 @@ class ProductForm(StyledFormMixin, forms.ModelForm):
             raise forms.ValidationError('Couleur invalide.')
         return color
 
+    def _taken(self, **lookup):
+        return Product.objects.filter(account=self.account, **lookup).exclude(pk=self.instance.pk).exists()
+
+    def clean_title(self):
+        title = ' '.join((self.cleaned_data.get('title') or '').split())
+        if title and self._taken(title__iexact=title):
+            raise forms.ValidationError('Un produit porte déjà ce nom.')
+        return title
+
     def clean_barcode(self):
-        return (self.cleaned_data.get('barcode') or '').strip() or None
+        code = (self.cleaned_data.get('barcode') or '').strip() or None
+        if code and self._taken(barcode=code):
+            raise forms.ValidationError('Ce code-barres est déjà attribué à un autre produit.')
+        return code
 
     def clean(self):
         data = super().clean()
@@ -98,11 +117,21 @@ class CategoryForm(StyledFormMixin, forms.ModelForm):
         widgets = {'title': forms.TextInput(attrs={'placeholder': 'Ex : Boissons'}),
                    'color': ColorSwatches(choices=COLOR_CHOICES)}
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, account, **kwargs):
         super().__init__(*args, **kwargs)
+        self.account = account
+        if not self.instance.pk:
+            self.instance.account = account
         self.fields['color'].required = True
         if not self.instance.pk and not self.is_bound:
-            self.initial['color'] = Category.next_color()
+            self.initial['color'] = Category.next_color(account)
+
+    def clean_title(self):
+        title = ' '.join((self.cleaned_data.get('title') or '').split())
+        if title and Category.objects.filter(account=self.account, title__iexact=title) \
+                .exclude(pk=self.instance.pk).exists():
+            raise forms.ValidationError('Cette catégorie existe déjà.')
+        return title
 
 
 class StockForm(StyledFormMixin, forms.Form):

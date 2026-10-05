@@ -11,28 +11,28 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
-from aprovision.models import MouvementStock
+from accounts.decorators import shop_required
 from aprovision.services import StockError, adjust_stock, receive, restock
-from core.decorators import api_login_required, is_manager, manager_required
+from core.decorators import api_login_required, manager_required
 from core.utils import json_etag_response, to_cents
-from users.models import AppSetting
 from .forms import CategoryForm, ProductForm, StockForm
-from .models import DEFAULT_CATEGORY_COLOR, Category, Product, get_low_stock_threshold
+from .models import DEFAULT_CATEGORY_COLOR, Stock
 
 
 @login_required
 def product_list(request):
-    products = Product.objects.select_related('category')
+    scope = request.scope
+    products = scope.products_with_qty().select_related('category')
     q = request.GET.get('q', '').strip()
     if q:
         products = products.filter(Q(title__icontains=q) | Q(barcode=q) | Q(category__title__icontains=q))
     category = request.GET.get('category', '')
     if category.isdigit():
         products = products.filter(category_id=category)
-    threshold = get_low_stock_threshold()
+    threshold = scope.settings().low_stock_threshold
     status = request.GET.get('status', '')
     if status == 'low':
-        products = products.filter(active=True, qty__lt=threshold)
+        products = scope.low_stock(products.filter(active=True), threshold)
     elif status == 'inactive':
         products = products.filter(active=False)
     elif status != 'all':
@@ -41,24 +41,26 @@ def product_list(request):
     page = Paginator(products.order_by('title'), 50).get_page(request.GET.get('page'))
     return render(request, 'product/list.html', {
         'page_obj': page,
-        'categories': Category.objects.all(),
+        'categories': scope.categories(),
         'q': q,
         'category': category,
         'status': status,
         'threshold': threshold,
-        'low_count': Product.objects.filter(active=True, qty__lt=threshold).count(),
+        'low_count': scope.low_stock(scope.products_with_qty().filter(active=True), threshold).count(),
     })
 
 
 @manager_required
 def product_create(request):
-    form = ProductForm(request.POST or None)
+    scope = request.scope
+    form = ProductForm(request.POST or None, account=scope.account, shop=scope.shop)
     if request.method == 'POST' and form.is_valid():
         with transaction.atomic():
             product = form.save()
             initial = form.cleaned_data.get('initial_qty') or 0
-            if initial > 0:
-                adjust_stock(product.pk, 'add', initial, user=request.user, description='Stock initial')
+            if initial > 0 and scope.shop:
+                adjust_stock(product.pk, 'add', initial, shop=scope.shop, user=request.user,
+                             description='Stock initial')
         messages.success(request, f'Produit « {product.title} » ajouté.')
         if 'again' in request.POST:
             return redirect('product:add_product')
@@ -68,43 +70,51 @@ def product_create(request):
 
 @manager_required
 def product_edit(request, pk):
-    product = get_object_or_404(Product, pk=pk)
-    form = ProductForm(request.POST or None, instance=product)
+    product = get_object_or_404(request.scope.products(), pk=pk)
+    form = ProductForm(request.POST or None, instance=product, account=request.scope.account)
     if request.method == 'POST' and form.is_valid():
         form.save()
         messages.success(request, f'Produit « {product.title} » modifié.')
         return redirect('product:product_list')
-    return render(request, 'product/form.html', {'form': form, 'product': product,
-                                                 'title': f'Modifier « {product.title} »'})
+    return render(request, 'product/form.html', {
+        'form': form, 'product': product, 'title': f'Modifier « {product.title} »',
+        'stock_rows': request.scope.stock_by_shop([product.pk])[product.pk],
+    })
+
+
+def _shop_qty(shop, product):
+    return Stock.objects.filter(shop=shop, product=product).values_list('qty', flat=True).first() or 0
 
 
 @manager_required
+@shop_required
 def product_stock(request, pk):
-    product = get_object_or_404(Product, pk=pk)
+    scope = request.scope
+    product = get_object_or_404(scope.products(), pk=pk)
     form = StockForm(request.POST or None, initial={'unit_cost': product.prix_achat or None})
     if request.method == 'POST' and form.is_valid():
         d = form.cleaned_data
         try:
             if d['action'] == 'restock':
-                restock(product.pk, d['quantity'], d['unit_cost'], user=request.user,
+                restock(product.pk, d['quantity'], d['unit_cost'], shop=scope.shop, user=request.user,
                         fournisseur=d['fournisseur'], description=d['description'])
             else:
-                adjust_stock(product.pk, d['action'], d['quantity'], user=request.user,
+                adjust_stock(product.pk, d['action'], d['quantity'], shop=scope.shop, user=request.user,
                              description=d['description'])
         except StockError as exc:
             messages.error(request, str(exc))
         else:
-            product.refresh_from_db()
-            messages.success(request, f'Stock de « {product.title} » : {product.qty}.')
+            messages.success(request, f'Stock de « {product.title} » à {scope.shop} : {_shop_qty(scope.shop, product)}.')
             return redirect('product:product_list')
-    movements = MouvementStock.objects.filter(produit=product).select_related('created_by')[:15]
+    product.qty = _shop_qty(scope.shop, product)
+    movements = scope.movements().filter(produit=product).select_related('created_by')[:15]
     return render(request, 'product/stock.html', {'form': form, 'product': product, 'movements': movements})
 
 
 @require_POST
 @manager_required
 def product_toggle(request, pk):
-    product = get_object_or_404(Product, pk=pk)
+    product = get_object_or_404(request.scope.products(), pk=pk)
     product.active = not product.active
     product.save(update_fields=['active', 'updated_at'])
     messages.success(request, f'« {product.title} » {"remis en vente" if product.active else "retiré de la vente"}.')
@@ -113,7 +123,7 @@ def product_toggle(request, pk):
 
 @manager_required
 def product_delete(request, pk):
-    product = get_object_or_404(Product, pk=pk)
+    product = get_object_or_404(request.scope.products(), pk=pk)
     if request.method == 'POST':
         try:
             product.delete()
@@ -132,20 +142,21 @@ def product_delete(request, pk):
 
 @manager_required
 def category_management(request):
-    Category.get_default()
-    form = CategoryForm(request.POST or None)
+    scope = request.scope
+    scope.default_category()
+    form = CategoryForm(request.POST or None, account=scope.account)
     if request.method == 'POST' and form.is_valid():
         category = form.save()
         messages.success(request, f'Catégorie « {category.title} » créée.')
         return redirect('product:category_management')
-    categories = Category.objects.annotate(n=Count('product')).order_by('-is_default', 'title')
+    categories = scope.categories().annotate(n=Count('product')).order_by('-is_default', 'title')
     return render(request, 'product/categories.html', {'form': form, 'categories': categories})
 
 
 @manager_required
 def category_edit(request, pk):
-    category = get_object_or_404(Category, pk=pk)
-    form = CategoryForm(request.POST or None, instance=category)
+    category = get_object_or_404(request.scope.categories(), pk=pk)
+    form = CategoryForm(request.POST or None, instance=category, account=request.scope.account)
     if request.method == 'POST' and form.is_valid():
         form.save()
         messages.success(request, f'Catégorie « {category.title} » modifiée.')
@@ -156,14 +167,15 @@ def category_edit(request, pk):
 @require_POST
 @manager_required
 def category_delete(request, pk):
-    category = get_object_or_404(Category, pk=pk)
+    scope = request.scope
+    category = get_object_or_404(scope.categories(), pk=pk)
     if category.is_default:
         messages.error(request, f'La catégorie « {category.title} » ne peut pas être supprimée : '
                                 'elle accueille les produits sans catégorie.')
         return redirect('product:category_management')
-    default = Category.get_default()
+    default = scope.default_category()
     with transaction.atomic():
-        moved = Product.objects.filter(category=category).update(category=default, updated_at=timezone.now())
+        moved = scope.products().filter(category=category).update(category=default, updated_at=timezone.now())
         category.delete()
     messages.success(request, f'Catégorie « {category.title} » supprimée'
                               + (f' : {moved} produit{"s" if moved > 1 else ""} déplacé{"s" if moved > 1 else ""} '
@@ -174,29 +186,33 @@ def category_delete(request, pk):
 # ---------------------------------------------------------------- Approvisionnement (réception)
 
 @login_required
+@shop_required
 def restock_page(request):
-    Category.get_default()
-    return render(request, 'product/restock.html', {'categories': Category.objects.all()})
+    request.scope.default_category()
+    return render(request, 'product/restock.html', {'categories': request.scope.categories()})
 
 
 @require_GET
 @api_login_required
+@shop_required
 def api_stock_catalog(request):
-    """Catalogue de la réception : tous les produits (même retirés de la vente), avec prix d'achat."""
-    rows = Product.objects.order_by('title').values_list(
+    """Catalogue de la réception : tous les produits (même retirés de la vente), stock de la boutique."""
+    scope = request.scope
+    rows = scope.products_with_qty().order_by('title').values_list(
         'id', 'title', 'barcode', 'value', 'qty', 'category_id', 'prix_achat', 'active', 'discount_value',
         'color', 'category__color')
     return json_etag_response(request, {
-        'currency': AppSetting.get_currency_label(),
+        'currency': scope.account.currency,
         'products': [[pid, title, barcode or '', to_cents(value), qty, cat or 0, to_cents(cost),
                       1 if active else 0, to_cents(promo), color or cat_color or DEFAULT_CATEGORY_COLOR]
                      for pid, title, barcode, value, qty, cat, cost, active, promo, color, cat_color in rows],
-        'categories': list(Category.objects.values_list('id', 'title', 'color')),
+        'categories': list(scope.categories().values_list('id', 'title', 'color')),
     })
 
 
 @require_POST
 @api_login_required
+@shop_required
 def api_receive(request):
     try:
         payload = json.loads(request.body or b'{}')
@@ -204,10 +220,10 @@ def api_receive(request):
     except (ValueError, KeyError):
         return JsonResponse({'ok': False, 'error': 'Requête invalide.'}, status=400)
     try:
-        result = receive(payload.get('lines'), user=request.user, key=key,
+        result = receive(payload.get('lines'), user=request.user, shop=request.scope.shop, key=key,
                          fournisseur=str(payload.get('fournisseur') or ''),
                          reference=str(payload.get('reference') or ''),
-                         can_set_price=is_manager(request.user))
+                         can_set_price=request.scope.is_manager)
     except StockError as exc:
         return JsonResponse({'ok': False, 'error': str(exc)}, status=400)
     if result is None:

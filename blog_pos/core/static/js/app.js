@@ -32,6 +32,16 @@
     setTimeout(function () { delete form.dataset.sent; }, 8000);
   });
 
+  // Liste qui s'applique dès qu'on choisit (ex. boutique affichée) : <select data-autosubmit>
+  doc.addEventListener('change', function (e) {
+    var el = e.target;
+    if (el.matches && el.matches('select[data-autosubmit]') && el.form) {
+      // Les deux listes (complète et compacte) portent le même nom : seule celle modifiée part.
+      el.form.querySelectorAll('select[data-autosubmit]').forEach(function (s) { s.disabled = s !== el; });
+      el.form.submit();
+    }
+  });
+
   // Les messages de succès disparaissent seuls
   setTimeout(function () {
     doc.querySelectorAll('[data-autohide]').forEach(function (el) { el.remove(); });

@@ -53,7 +53,7 @@
           <th class="px-5 py-3">Catégorie</th>
           <th class="px-5 py-3 text-right">Prix</th>
           {% if is_mgr %}<th class="px-5 py-3 text-right">Achat</th>{% endif %}
-          <th class="px-5 py-3 text-right">Stock</th>
+          <th class="px-5 py-3 text-right" {% if scope.all_shops %}title="Total des boutiques"{% endif %}>Stock{% if scope.all_shops %} <span class="font-normal">(total)</span>{% endif %}</th>
           {% if is_mgr %}<th class="px-5 py-3"></th>{% endif %}
         </tr>
       </thead>

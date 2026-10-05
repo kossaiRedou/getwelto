@@ -1,0 +1,17 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<h2>Supprimer définitivement {{ accounts|length }} compte{{ accounts|length|pluralize }} client{{ accounts|length|pluralize }}</h2>
+<p><strong>Toutes leurs données seront effacées et ne pourront pas être récupérées :</strong>
+  ventes, paiements, stock, produits, clients, dépenses, boutiques et utilisateurs.</p>
+<ul>{% for a in accounts %}<li><strong>{{ a.name }}</strong> — {{ a.get_country_display }}, inscrit le {{ a.created_at|date:"d/m/Y" }}</li>{% endfor %}</ul>
+<p>Pour bloquer l'accès sans rien perdre, utilisez plutôt l'action « Suspendre ».</p>
+<form method="post">{% csrf_token %}
+  {% for a in accounts %}<input type="hidden" name="_selected_action" value="{{ a.pk }}">{% endfor %}
+  <input type="hidden" name="action" value="{{ action }}">
+  <p><label>Tapez <strong>SUPPRIMER</strong> pour confirmer :
+    <input name="confirm" autocomplete="off" required></label></p>
+  {% if wrong %}<p style="color:#b91c1c">Le mot tapé ne correspond pas : rien n'a été supprimé.</p>{% endif %}
+  <input type="submit" value="Supprimer définitivement" class="default" style="background:#b91c1c">
+  <a href="{% url 'admin:accounts_account_changelist' %}" class="button cancel-link">Annuler</a>
+</form>
+{% endblock %}
