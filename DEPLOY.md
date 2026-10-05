@@ -60,11 +60,12 @@ python manage.py createsuperuser
 
 Ce compte n'appartient à aucun client : il ouvre directement l'admin (`https://caisse.maboutique.com/admin/`).
 
-### Mise à jour d'une installation existante (avant le SaaS)
+### Installation déjà déployée avant le SaaS : base à vider
 
-Les migrations ne suppriment rien : les données déjà présentes (produits, ventes, clients, stock…) deviennent le
-**premier compte client**, avec une seule boutique, actif et sans date de fin. Son gérant garde ses identifiants.
-Pour repartir de zéro, supprimez ce compte dans l'admin (action « Supprimer définitivement avec toutes les données »).
+Les migrations repartent de zéro pour la version SaaS (`0001_initial`). Une base PostgreSQL qui contient
+déjà les tables de l'ancienne version doit être **vidée avant le déploiement**, sinon l'application démarre sur un
+schéma qui ne correspond plus. Dans Coolify : supprimer puis recréer la base PostgreSQL (ou, dans son terminal,
+`DROP SCHEMA public CASCADE; CREATE SCHEMA public;`), puis redéployer et recréer le compte propriétaire.
 
 ## Gérer les comptes clients (admin Django)
 
