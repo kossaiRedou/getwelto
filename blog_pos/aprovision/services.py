@@ -173,13 +173,15 @@ def _parse_reception(lines):
     return parsed, ids
 
 
-def receive(lines, *, user, fournisseur='', reference='', key=None):
+def receive(lines, *, user, fournisseur='', reference='', key=None, can_set_price=True):
     """Réception de marchandises (page « Approvisionnement ») — tout ou rien.
 
     Chaque ligne : {'product_id': id} pour un produit existant, ou
     {'new': {'title', 'barcode', 'category_id', 'price'}} pour le créer, plus
     'qty' (reçue), 'unit_cost' (prix d'achat) et en option 'price' (nouveau prix
     de vente) et 'barcode' (code-barres à associer à un produit existant).
+    Sans `can_set_price` (employé), le prix de vente d'un produit existant ne
+    peut pas changer ; un nouveau produit reçoit toujours son prix.
     Une seule dépense « Approvisionnement » couvre tout le bon.
     `key` rend l'opération idempotente : renvoyée deux fois (réseau lent), elle
     n'est enregistrée qu'une fois — le second appel retourne None.
@@ -223,6 +225,8 @@ def receive(lines, *, user, fournisseur='', reference='', key=None):
 
                 product = products[item['product_id']]
                 if item['price'] is not None and item['price'] != product.value:
+                    if not can_set_price:
+                        raise StockError(f'Seul le gérant peut changer le prix de vente de « {product.title} ».')
                     if item['price'] <= 0:
                         raise StockError(f'Prix de vente de « {product.title} » invalide.')
                     if product.discount_value and product.discount_value >= item['price']:

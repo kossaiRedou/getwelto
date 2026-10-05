@@ -13,7 +13,8 @@
      data-receive-url="{% url 'product:api_receive' %}"
      data-login-url="{% url 'users:login' %}"
      data-zxing-url="{% static 'vendor/zxing-0.21.3.min.js' %}"
-     data-currency="{{ currency }}">
+     data-currency="{{ currency }}"
+     data-can-price="{% if request.user|manager %}1{% else %}0{% endif %}">
 
   {# ------------------------------------------------ Recherche / produits #}
   <section class="flex min-h-0 flex-col lg:flex-1 [.searching_&]:flex-1">
@@ -42,7 +43,7 @@
     <ul id="lines" class="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-2"></ul>
     <div id="empty" class="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center text-slate-500">
       {% icon 'truck' 'h-10 w-10' %}
-      <p>Scannez les produits reçus. Pour chacun : quantité reçue, prix d'achat et, si besoin, nouveau prix de vente.</p>
+      <p>Scannez les produits reçus. Pour chacun : quantité reçue, prix d'achat{% if request.user|manager %} et, si besoin, nouveau prix de vente{% endif %}.</p>
     </div>
 
     <div class="space-y-3 border-t border-navy-700 p-3 pb-[max(.75rem,env(safe-area-inset-bottom))]">

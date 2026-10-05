@@ -152,6 +152,27 @@ class ReceptionTests(TestCase):
         mv = MouvementStock.objects.filter(produit=self.riz).latest('id')
         self.assertEqual(mv.created_by, self.employee)
 
+    def test_employee_cannot_change_selling_price(self):
+        self.client.force_login(self.employee)
+        r = self.post({'lines': [{'product_id': self.riz.pk, 'qty': 1, 'unit_cost': '20000', 'price': '30000'}],
+                       'key': str(uuid.uuid4())})
+        self.assertEqual(r.status_code, 400)
+        self.assertIn('gérant', r.json()['error'])
+        self.riz.refresh_from_db()
+        self.assertEqual((self.riz.value, self.riz.qty), (D('25000'), 10))   # rien n'a bougé
+        # Prix inchangé renvoyé : accepté. Nouveau produit : l'employé fixe son prix.
+        r = self.post({'lines': [{'product_id': self.riz.pk, 'qty': 1, 'unit_cost': '21000', 'price': '25000'},
+                                 {'new': {'title': 'Sucre 1kg', 'price': '9000'}, 'qty': 4, 'unit_cost': '7000'}],
+                       'key': str(uuid.uuid4())})
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(Product.objects.get(title='Sucre 1kg').value, D('9000'))
+        self.client.force_login(self.manager)
+        r = self.post({'lines': [{'product_id': self.riz.pk, 'qty': 1, 'unit_cost': '21000', 'price': '30000'}],
+                       'key': str(uuid.uuid4())})
+        self.assertEqual(r.status_code, 200, r.content)
+        self.riz.refresh_from_db()
+        self.assertEqual(self.riz.value, D('30000'))
+
     def test_employee_still_kept_out_of_management(self):
         self.client.force_login(self.employee)
         for name in ('dashboard', 'aprovision:reports', 'aprovision:depense_list', 'product:add_product'):

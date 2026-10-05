@@ -206,7 +206,8 @@ def api_receive(request):
     try:
         result = receive(payload.get('lines'), user=request.user, key=key,
                          fournisseur=str(payload.get('fournisseur') or ''),
-                         reference=str(payload.get('reference') or ''))
+                         reference=str(payload.get('reference') or ''),
+                         can_set_price=request.user.is_manager())
     except StockError as exc:
         return JsonResponse({'ok': False, 'error': str(exc)}, status=400)
     if result is None:

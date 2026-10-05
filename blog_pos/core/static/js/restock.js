@@ -14,6 +14,8 @@
 
   var K = window.WeltoKit;
   var esc = K.esc, norm = K.norm, fmt = K.fmt, parseMoney = K.parseMoney, toDecimal = K.toDecimal, toInput = K.toInput;
+  // Seul le gérant change le prix de vente d'un produit existant (le serveur le vérifie aussi).
+  var CAN_PRICE = root.dataset.canPrice === '1';
   var STORE_CATALOG = 'welto.stockcatalog.v1';
   var STORE_DRAFT = 'welto.restock.v1';
   var $ = function (id) { return document.getElementById(id); };
@@ -166,8 +168,8 @@
   }
 
   function lineCalc(l) {
-    var cost = parseMoney(l.cost), price = parseMoney(l.price);
     var p = l.id ? catalog.byId[l.id] : null;
+    var cost = parseMoney(l.cost), price = (p && !CAN_PRICE) ? p.price : parseMoney(l.price);
     return {
       cost: cost, price: price,
       costOk: cost !== null && !isNaN(cost),
@@ -226,7 +228,9 @@
         '<button type="button" class="step" data-inc aria-label="Plus">' + PLUS + '</button></div>' +
         '<div class="mt-2 grid grid-cols-2 gap-2">' +
         '<label class="text-xs text-slate-400">Prix d\'achat<input data-f="cost" value="' + esc(l.cost) + '" inputmode="decimal" placeholder="0" class="mt-1 ' + FIELD + (c.costOk ? ' border-navy-600' : ' border-rose-500') + '"></label>' +
-        '<label class="text-xs text-slate-400">Prix de vente<input data-f="price" value="' + esc(l.price) + '" inputmode="decimal" class="mt-1 ' + FIELD + (c.priceOk ? ' border-navy-600' : ' border-rose-500') + '"></label>' +
+        (l.id && !CAN_PRICE
+          ? '<div class="text-xs text-slate-400">Prix de vente<p class="mt-1 rounded-lg border border-navy-700 px-3 py-2 text-right font-semibold text-slate-300" title="Fixé par le gérant">' + fmt(c.price) + '</p></div>'
+          : '<label class="text-xs text-slate-400">Prix de vente<input data-f="price" value="' + esc(l.price) + '" inputmode="decimal" class="mt-1 ' + FIELD + (c.priceOk ? ' border-navy-600' : ' border-rose-500') + '"></label>') +
         '</div><p class="mt-2 text-right text-sm text-slate-400">Coût : <b class="text-lg tabular-nums text-white" data-total>' + fmt(c.total) + '</b></p></li>';
     }).join('');
   }
@@ -240,7 +244,8 @@
       node.querySelector('[data-total]').textContent = fmt(c.total);
       node.querySelector('[data-info]').innerHTML = lineInfo(l);
       node.querySelector('[data-f="cost"]').classList.toggle('border-rose-500', !c.costOk);
-      node.querySelector('[data-f="price"]').classList.toggle('border-rose-500', !c.priceOk);
+      var priceField = node.querySelector('[data-f="price"]');
+      if (priceField) priceField.classList.toggle('border-rose-500', !c.priceOk);
     });
     renderFooter();
   }
@@ -289,7 +294,7 @@
       if (l.id) {
         var p = catalog.byId[l.id];
         return { product_id: l.id, qty: l.qty, unit_cost: toDecimal(c.cost),
-                 price: c.price !== p.price ? toDecimal(c.price) : null, barcode: l.barcode || null };
+                 price: CAN_PRICE && c.price !== p.price ? toDecimal(c.price) : null, barcode: l.barcode || null };
       }
       return { new: { title: l.newp.title, barcode: l.newp.barcode || null, category_id: l.newp.category_id || null,
                       price: toDecimal(c.price) },
