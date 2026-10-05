@@ -49,6 +49,19 @@
   function toInput(cents) {
     return toDecimal(cents).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
   }
+  // Douchette réglée en clavier américain sur un ordinateur en AZERTY : les chiffres arrivent
+  // sous forme de « &é"'(-è_çà ». On les retraduit quand la saisie ressemble à un scan
+  // (pas d'espace, 6 caractères ou plus, majorité de ces caractères). Même règle côté serveur
+  // (core.utils.fix_scanned_code). « Coca-Cola » ou « Thé-Café » ne sont pas touchés.
+  var AZERTY_DIGITS = { '&': '1', 'é': '2', '"': '3', "'": '4', '(': '5', '-': '6', 'è': '7', '_': '8', 'ç': '9', 'à': '0' };
+  function fixScan(text) {
+    text = String(text == null ? '' : text).trim();
+    if (text.length < 6 || /\s/.test(text)) return text;
+    var chars = text.split(''), hits = 0;
+    chars.forEach(function (c) { if (AZERTY_DIGITS[c]) hits++; });
+    if (hits * 2 <= chars.length) return text;
+    return chars.map(function (c) { return AZERTY_DIGITS[c] || c; }).join('');
+  }
   // « Coca-Cola 1L » → « CC » (même règle que product.models.initials)
   function initials(title) {
     var words = String(title || '').split(/[\s\-_\/.,]+/).filter(Boolean);
@@ -139,7 +152,7 @@
   }
 
   window.WeltoKit = {
-    loadJSON: loadJSON, saveJSON: saveJSON, esc: esc, norm: norm, fmt: fmt, parseMoney: parseMoney,
+    loadJSON: loadJSON, saveJSON: saveJSON, esc: esc, norm: norm, fmt: fmt, parseMoney: parseMoney, fixScan: fixScan,
     toDecimal: toDecimal, toInput: toInput, uuid: uuid, initials: initials, safeColor: safeColor, badge: badge, textOnDark: textOnDark, beep: beep, toaster: toaster, requester: requester,
     finePointer: !!(window.matchMedia && window.matchMedia('(pointer: fine)').matches)
   };

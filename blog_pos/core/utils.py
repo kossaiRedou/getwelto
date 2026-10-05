@@ -5,6 +5,22 @@ CENT = Decimal('0.01')
 NNBSP = ' '
 
 
+AZERTY_DIGITS = str.maketrans('&é"\'(-è_çà', '1234567890')
+
+
+def fix_scanned_code(text):
+    """Code-barres tapé par une douchette réglée en clavier américain sur un poste AZERTY.
+
+    « &é"'(-è_çà » → « 1234567890 », seulement si la saisie ressemble à un scan :
+    pas d'espace, 6 caractères ou plus, majorité de ces caractères (même règle que kit.js).
+    """
+    text = (text or '').strip()
+    if len(text) < 6 or any(c.isspace() for c in text):
+        return text
+    hits = sum(1 for c in text if c in '&é"\'(-è_çà')
+    return text.translate(AZERTY_DIGITS) if hits * 2 > len(text) else text
+
+
 def format_money(value):
     """38000 → « 38 000 » ; 1250.5 → « 1 250,50 » (centimes affichés seulement s'il y en a)."""
     if value in (None, ''):

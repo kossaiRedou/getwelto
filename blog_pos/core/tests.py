@@ -18,6 +18,16 @@ class FormatTests(TestCase):
         self.assertEqual(format_money(Decimal('-15')), '-15')
         self.assertEqual(format_money(None), '0')
 
+    def test_azerty_scanner_codes_are_fixed(self):
+        """Douchette en clavier américain sur un poste AZERTY : « &é"'(-è_çà » = 1234567890."""
+        from core.utils import fix_scanned_code
+        self.assertEqual(fix_scanned_code('&é"\'(-è_çà'), '1234567890')
+        self.assertEqual(fix_scanned_code('-G&-"&àà_(-&ç&ààé(àààà_ç'), '6G1631008561910025000089')
+        self.assertEqual(fix_scanned_code(' 6001234567890 '), '6001234567890')
+        for name in ('Coca-Cola', 'Thé-Café', 'Coca-Cola 1L', 'àà', ''):
+            with self.subTest(name=name):
+                self.assertEqual(fix_scanned_code(name), name.strip())
+
 
 class PagesTests(TestCase):
     @classmethod

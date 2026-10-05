@@ -14,7 +14,7 @@ from django.views.decorators.http import require_GET, require_POST
 from accounts.decorators import shop_required
 from aprovision.services import StockError, adjust_stock, receive, restock
 from core.decorators import api_login_required, manager_required
-from core.utils import json_etag_response, to_cents
+from core.utils import fix_scanned_code, json_etag_response, to_cents
 from .forms import CategoryForm, ProductForm, StockForm
 from .models import DEFAULT_CATEGORY_COLOR, Stock
 
@@ -25,7 +25,8 @@ def product_list(request):
     products = scope.products_with_qty().select_related('category')
     q = request.GET.get('q', '').strip()
     if q:
-        products = products.filter(Q(title__icontains=q) | Q(barcode=q) | Q(category__title__icontains=q))
+        code = fix_scanned_code(q)
+        products = products.filter(Q(title__icontains=q) | Q(barcode=code) | Q(category__title__icontains=q))
     category = request.GET.get('category', '')
     if category.isdigit():
         products = products.filter(category_id=category)

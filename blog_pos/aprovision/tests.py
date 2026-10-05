@@ -171,6 +171,21 @@ class ReceptionTests(TestCase):
         self.riz.refresh_from_db()
         self.assertEqual(self.riz.value, D('30000'))
 
+    def test_azerty_scanned_barcode_is_stored_as_digits(self):
+        receive([{'new': {'title': 'Lait 1L', 'barcode': '(-è_çàé"', 'price': '9000'}, 'qty': 2, 'unit_cost': '7000'},
+                 {'product_id': self.riz.pk, 'qty': 1, 'unit_cost': '20000', 'barcode': '"&àà_(-&'}],
+                user=self.manager, shop=self.shop)
+        self.assertEqual(Product.objects.get(title='Lait 1L').barcode, '56789023')
+        self.riz.refresh_from_db()
+        self.assertEqual(self.riz.barcode, '31008561')
+        self.client.force_login(self.manager)
+        r = self.client.post(reverse('product:edit_product', args=[self.huile.pk]),
+                             {'title': 'Huile 1L', 'value': '12000', 'barcode': 'é"\'(-è_ç', 'active': 'on'})
+        self.assertRedirects(r, reverse('product:product_list'))
+        self.huile.refresh_from_db()
+        self.assertEqual(self.huile.barcode, '23456789')
+        self.assertContains(self.client.get(reverse('product:product_list'), {'q': 'é"\'(-è_ç'}), 'Huile 1L')
+
     def test_employee_still_kept_out_of_management(self):
         self.client.force_login(self.employee)
         for name in ('dashboard', 'aprovision:reports', 'aprovision:depense_list', 'product:add_product'):

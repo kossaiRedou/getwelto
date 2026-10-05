@@ -104,7 +104,9 @@
   // ------------------------------------------------------------- recherche
   function parseQuery(raw) {
     var m = String(raw).trim().match(/^(\d{1,6})\s*[*xX×]\s*(.*)$/);
-    return m ? { qty: parseInt(m[1], 10), text: m[2].trim() } : { qty: 1, text: String(raw).trim() };
+    var q = m ? { qty: parseInt(m[1], 10), text: m[2].trim() } : { qty: 1, text: String(raw).trim() };
+    q.text = K.fixScan(q.text);   // scan d'une douchette en clavier américain sur un PC AZERTY
+    return q;
   }
 
   function findProducts(text) {

@@ -13,6 +13,7 @@ from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
 
+from core.utils import fix_scanned_code
 from product.models import Product, Stock
 from .models import Depense, MouvementStock, TypeDepense, TypeMouvement
 
@@ -146,7 +147,7 @@ def _parse_reception(lines):
             'qty': qty,
             'unit_cost': money(line.get('unit_cost'), "Prix d'achat", required=True),
             'price': money(line.get('price'), 'Prix de vente'),
-            'barcode': str(line.get('barcode') or '').strip() or None,
+            'barcode': fix_scanned_code(str(line.get('barcode') or '')) or None,
         }
         new = line.get('new')
         if new:
@@ -160,7 +161,7 @@ def _parse_reception(lines):
             item['price'] = money(new.get('price'), 'Prix de vente', required=True)
             if item['price'] <= 0:
                 raise StockError(f'Prix de vente de « {title} » obligatoire.')
-            item['barcode'] = str(new.get('barcode') or '').strip() or None
+            item['barcode'] = fix_scanned_code(str(new.get('barcode') or '')) or None
         else:
             try:
                 pid = int(line.get('product_id'))

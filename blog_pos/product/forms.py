@@ -3,6 +3,7 @@ from decimal import Decimal
 from django import forms
 
 from core.forms import ColorSwatches, StyledFormMixin
+from core.utils import fix_scanned_code
 from .models import COLOR_CHOICES, Category, Product
 
 MONEY_ATTRS = {'inputmode': 'decimal', 'step': '0.01', 'min': '0'}
@@ -90,7 +91,7 @@ class ProductForm(StyledFormMixin, forms.ModelForm):
         return title
 
     def clean_barcode(self):
-        code = (self.cleaned_data.get('barcode') or '').strip() or None
+        code = fix_scanned_code(self.cleaned_data.get('barcode')) or None
         if code and self._taken(barcode=code):
             raise forms.ValidationError('Ce code-barres est déjà attribué à un autre produit.')
         return code

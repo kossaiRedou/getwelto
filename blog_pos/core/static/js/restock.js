@@ -89,7 +89,9 @@
   // ------------------------------------------------------------- recherche
   function parseQuery(raw) {
     var m = String(raw).trim().match(/^(\d{1,6})\s*[*xX×]\s*(.*)$/);
-    return m ? { qty: parseInt(m[1], 10), text: m[2].trim() } : { qty: 1, text: String(raw).trim() };
+    var q = m ? { qty: parseInt(m[1], 10), text: m[2].trim() } : { qty: 1, text: String(raw).trim() };
+    q.text = K.fixScan(q.text);   // scan d'une douchette en clavier américain sur un PC AZERTY
+    return q;
   }
   function findProducts(text, limit) {
     var tokens = norm(text).split(/\s+/).filter(Boolean);
@@ -111,7 +113,11 @@
     for (var i = 0; i < catalog.products.length; i++) if (norm(catalog.products[i].title) === t) return catalog.products[i];
     return null;
   }
-  function looksLikeBarcode(text) { return /^\d{6,}$/.test(text); }
+  // Code-barres : sans espace, 6 caractères ou plus, surtout des chiffres (certains codes contiennent des lettres).
+  function looksLikeBarcode(text) {
+    if (!/^[0-9A-Za-z]{6,}$/.test(text)) return false;
+    return text.replace(/\D/g, '').length * 10 >= text.length * 6;
+  }
 
   function renderResults() {
     var q = parseQuery(el.search.value);
@@ -372,7 +378,7 @@
     e.preventDefault();
     var f = el.form;
     var title = f.title.value.replace(/\s+/g, ' ').trim();
-    var barcode = f.barcode.value.trim();
+    var barcode = K.fixScan(f.barcode.value);
     var cost = parseMoney(f.cost.value), price = parseMoney(f.price.value);
     var qty = parseInt(f.qty.value.replace(/\D/g, ''), 10);
     var error = '';
