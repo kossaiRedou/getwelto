@@ -125,17 +125,6 @@ class ForgotRequestForm(StyledFormMixin, forms.Form):
                                  widget=forms.TextInput(attrs={'autofocus': True}))
 
 
-class ForgotCodeForm(StyledFormMixin, forms.Form):
-    code = forms.CharField(label='Code reçu par email', max_length=6,
-                           widget=forms.TextInput(attrs={'inputmode': 'numeric', 'autocomplete': 'one-time-code',
-                                                         'placeholder': '6 chiffres'}))
-    new_password1 = _password_field('Nouveau mot de passe')
-    new_password2 = _password_field('Confirmer le nouveau mot de passe')
-
-    def clean(self):
-        return _validate_new_password_pair(super().clean())
-
-
 class AppSettingForm(StyledFormMixin, forms.ModelForm):
     class Meta:
         model = AppSetting

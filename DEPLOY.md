@@ -33,7 +33,7 @@ Onglet **Environment Variables** :
 | `CSRF_TRUSTED_ORIGINS` | `https://caisse.maboutique.com` | obligatoire |
 | `TIME_ZONE` | `Africa/Conakry` (Guinée) ou `Africa/Banjul` (Gambie) | recommandé |
 | `WEB_CONCURRENCY` | `2` (défaut) : suffisant pour une boutique ; augmenter seulement si le VPS a de la mémoire libre | facultatif |
-| `EMAIL_HOST`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` | pour le mot de passe oublié et l'alerte d'inscription | facultatif |
+| `EMAIL_HOST`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL` | envoi des emails (mot de passe oublié, alerte d'inscription) : voir « Emails avec Resend » ci-dessous | recommandé |
 | `SAAS_ADMIN_EMAILS` | votre email : vous êtes prévenu à chaque nouvelle inscription (plusieurs : séparés par des virgules) | recommandé |
 | `SAAS_CONTACT` | ce que voient vos clients bloqués ou en fin d'abonnement, ex. `WhatsApp +224 620 00 00 00` | recommandé |
 
@@ -41,6 +41,28 @@ L'image fonctionne d'office en mode production : `DEBUG` désactivé, HTTPS (coo
 **Si une variable obligatoire manque, l'application refuse de démarrer** et le journal du conteneur indique laquelle — c'est voulu, pour ne jamais tourner avec une configuration incomplète (par exemple sans PostgreSQL).
 
 Ne changez jamais `SECRET_KEY` après la mise en service : toutes les sessions seraient déconnectées.
+
+### Emails avec Resend
+
+Les emails (lien « mot de passe oublié », alerte de nouvelle inscription) partent par le serveur SMTP de
+[Resend](https://resend.com), sans aucune bibliothèque à installer.
+
+1. Sur resend.com : **Domains → Add domain** (ex. `maboutique.com`), puis ajouter dans Cloudflare les
+   enregistrements DNS indiqués par Resend (en **DNS only**) et attendre que le domaine soit « Verified ».
+2. **API Keys → Create API Key** (permission *Sending access*).
+3. Variables dans Coolify :
+
+| Variable | Valeur |
+|---|---|
+| `EMAIL_HOST` | `smtp.resend.com` |
+| `EMAIL_PORT` | `587` |
+| `EMAIL_HOST_USER` | `resend` |
+| `EMAIL_HOST_PASSWORD` | la clé API `re_…` |
+| `EMAIL_USE_TLS` | `True` |
+| `DEFAULT_FROM_EMAIL` | `WELTO <no-reply@maboutique.com>` (adresse du domaine vérifié) |
+
+Le lien reçu est valable 1 heure et ne sert qu'une fois. Sans email sur son compte, un employé demande à son
+gérant (Utilisateurs → icône clé) ; un gérant sans email passe par vous (admin → Utilisateurs → mot de passe).
 
 ## 4. Stockage persistant
 

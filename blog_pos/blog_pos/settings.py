@@ -296,6 +296,9 @@ SECURE_REFERRER_POLICY = 'same-origin'
 # irréversible), pourrait casser ses autres sites.
 SILENCED_SYSTEM_CHECKS = ['security.W008', 'security.W005', 'security.W021']
 
+# Lien « mot de passe oublié » valable 1 heure (et une seule fois).
+PASSWORD_RESET_TIMEOUT = 60 * 60
+
 # Une session reste ouverte 7 jours sans activité (tablette de caisse partagée).
 SESSION_COOKIE_AGE = 60 * 60 * 24 * 7
 SESSION_SAVE_EVERY_REQUEST = False

@@ -1,18 +1,23 @@
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.tokens import default_token_generator
+from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from core.decorators import is_manager, manager_required
-from core.throttle import is_locked
-from .emailing import send_reset_code_email
-from .forms import (AppSettingForm, CustomUserChangeForm, CustomUserCreationForm, ForgotCodeForm,
-                    ForgotRequestForm, ManagerResetPasswordForm, PasswordChangeForm)
-from .models import PasswordResetCode, User
+from core.throttle import client_ip, is_locked
+from .emailing import send_reset_link_email
+from .forms import (AppSettingForm, CustomUserChangeForm, CustomUserCreationForm, ForgotRequestForm,
+                    ManagerResetPasswordForm, PasswordChangeForm)
+from .models import User
 
 
 def login_view(request):
@@ -146,72 +151,54 @@ def my_password_change_view(request):
     return render(request, 'users/change_password.html', {'form': form, 'title': 'Changer mon mot de passe'})
 
 
-# --- Mot de passe oublié (code envoyé par email) ---
+# --- Mot de passe oublié : lien envoyé par email (Resend en SMTP) ---
 
-FORGOT_SESSION_KEY = 'forgot_pw_user_id'
+RESET_REQUESTS_PER_IP_PER_HOUR = 5
 
 
 def forgot_password_view(request):
+    """Envoie un lien de réinitialisation à l'email du compte (identifiant ou email saisi)."""
     if request.user.is_authenticated:
         return redirect('pos')
     form = ForgotRequestForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
+        key = f'reset:ip:{client_ip(request)}'
+        if (cache.get(key) or 0) >= RESET_REQUESTS_PER_IP_PER_HOUR:
+            messages.error(request, 'Trop de demandes depuis cette connexion. Réessayez dans une heure.')
+            return render(request, 'users/forgot_password.html', {'form': form}, status=429)
+        cache.add(key, 0, 3600)
+        cache.incr(key)
         identifier = form.cleaned_data['identifier'].strip()
-        user = User.objects.filter(Q(username__iexact=identifier) | Q(email__iexact=identifier),
-                                   is_active=True).first()
-        # Message identique que le compte existe ou non (ne révèle pas les comptes existants).
-        neutral = 'Si un compte correspond, un code vient d\'être envoyé à son adresse email.'
-        if user and user.email:
-            _, raw_code = PasswordResetCode.issue_for(user)
-            if not send_reset_code_email(user, raw_code):
+        user = (User.objects.filter(Q(username__iexact=identifier) | Q(email__iexact=identifier), is_active=True)
+                .exclude(email='').exclude(email__isnull=True).first())
+        if user:
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            link = request.build_absolute_uri(
+                reverse('users:reset_password', args=[uid, default_token_generator.make_token(user)]))
+            if not send_reset_link_email(user, link):
                 messages.error(request, "L'envoi de l'email a échoué. Réessayez dans un instant.")
                 return redirect('users:forgot_password')
-            request.session[FORGOT_SESSION_KEY] = user.id
-            messages.success(request, neutral)
-            return redirect('users:forgot_password_code')
-        messages.success(request, neutral)
-        return redirect('users:forgot_password')
+        # Même réponse que le compte existe ou non : la page ne révèle pas les comptes.
+        return redirect('users:forgot_password_sent')
     return render(request, 'users/forgot_password.html', {'form': form})
 
 
-def forgot_password_code_view(request):
-    if request.user.is_authenticated:
-        return redirect('pos')
-    user = User.objects.filter(id=request.session.get(FORGOT_SESSION_KEY), is_active=True).first()
-    if not user:
-        request.session.pop(FORGOT_SESSION_KEY, None)
-        return redirect('users:forgot_password')
+def forgot_password_sent_view(request):
+    return render(request, 'users/forgot_password_sent.html')
 
-    form = ForgotCodeForm(request.POST or None)
+
+def reset_password_view(request, uidb64, token):
+    """Lien reçu par email : utilisable une seule fois (le jeton change avec le mot de passe), 1 heure."""
+    try:
+        user = User.objects.get(pk=force_str(urlsafe_base64_decode(uidb64)), is_active=True)
+    except (User.DoesNotExist, ValueError, TypeError, OverflowError):
+        user = None
+    if user is None or not default_token_generator.check_token(user, token):
+        return render(request, 'users/reset_password.html', {'validlink': False})
+    form = ManagerResetPasswordForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
-        code_obj = PasswordResetCode.objects.filter(user=user, used=False).order_by('-created_at').first()
-        if not code_obj or not code_obj.is_valid():
-            messages.error(request, 'Code expiré ou invalide. Recommencez la demande.')
-            request.session.pop(FORGOT_SESSION_KEY, None)
-            return redirect('users:forgot_password')
-        code_obj.register_attempt()
-        if code_obj.check_code(form.cleaned_data['code']):
-            user.set_password(form.cleaned_data['new_password1'])
-            user.save()
-            code_obj.used = True
-            code_obj.save(update_fields=['used'])
-            request.session.pop(FORGOT_SESSION_KEY, None)
-            messages.success(request, 'Mot de passe réinitialisé. Vous pouvez vous connecter.')
-            return redirect('users:login')
-        remaining = PasswordResetCode.MAX_ATTEMPTS - code_obj.attempts
-        if remaining <= 0:
-            code_obj.used = True
-            code_obj.save(update_fields=['used'])
-            request.session.pop(FORGOT_SESSION_KEY, None)
-            messages.error(request, 'Trop de tentatives. Recommencez la demande.')
-            return redirect('users:forgot_password')
-        messages.error(request, f'Code incorrect. Il vous reste {remaining} tentative(s).')
-    return render(request, 'users/forgot_password_code.html',
-                  {'form': form, 'masked_email': _mask_email(user.email)})
-
-
-def _mask_email(email):
-    if not email or '@' not in email:
-        return ''
-    local, domain = email.split('@', 1)
-    return f'{local[:1]}***@{domain}'
+        user.set_password(form.cleaned_data['new_password1'])
+        user.save(update_fields=['password'])
+        messages.success(request, 'Mot de passe modifié. Vous pouvez vous connecter.')
+        return redirect('users:login')
+    return render(request, 'users/reset_password.html', {'validlink': True, 'form': form, 'target': user})
